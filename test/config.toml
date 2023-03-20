@@ -3,11 +3,11 @@ addr = "http://localhost:4434"
 
 [service]
 addr = "0.0.0.0"
-ports.main = "8080"
-ports.health = "1040"
+ports.main = "9080"
+ports.health = "2040"
 
 
 [iam.service]
-addr = "0.0.0.0"
-ports.main = "8080"
+addr = "127.0.0.1"
+ports.main = "5050"
 ports.health = "1040"

@@ -26,15 +26,15 @@ impl IntoResponse for RouterError {
                 error!("{:?}", e);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("INTERNAL_SERVER_ERROR: {}", e.root_cause()),
+                    "INTERNAL_SERVER_ERROR",
                 )
                     .into_response()
             }
             RouterError::StrConvert(e) => {
-                error!("{:?}", e);
+                error!("{:?}, while converting str", e);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("INTERNAL_SERVER_ERROR: {}", e),
+                    "INTERNAL_SERVER_ERROR",
                 )
             }
             .into_response(),

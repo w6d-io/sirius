@@ -3,7 +3,7 @@ use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use ory_kratos_client::models::Identity;
 use tonic::{transport::Channel, Request};
-use tracing::error;
+use tracing::{error, debug};
 
 use crate::{
     config::SiriusConfig,
@@ -31,6 +31,7 @@ async fn get_identity_by_mail(
         Some(identity) => identity.to_owned(),
         None => bail!("{uuid}: no identity found for {}", input.email),
     };
+    debug!("{:?}", identity);
     Ok(identity)
 }
 
@@ -41,11 +42,12 @@ async fn send_to_iam(
     uuid: &str,
 ) -> Result<()> {
     let identity = get_identity_by_mail(config, input, uuid).await?;
+    let role = "\"".to_owned() + &input.role as &str + "\"";
     let request = Request::new(TonicInput {
         id: identity.id,
         perm_type: input.ressource_type.clone(),
         resource: input.id.clone(),
-        role: input.role.clone(),
+        role,
     });
     client.replace_permission(request).await?;
     Ok(())

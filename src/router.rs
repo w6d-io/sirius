@@ -6,13 +6,14 @@ use axum_extra::extract::cookie::CookieJar;
 use serde::Deserialize;
 use tokio::sync::RwLock;
 use tower_http::request_id::RequestId;
-use tracing::error;
+use tracing::{info, error};
 
 use crate::{config::SiriusConfig, controler::update_controler, error::RouterError};
 
 #[derive(Deserialize)]
 pub struct Input {
     pub email: String,
+    #[serde(rename(deserialize = "type"))]
     pub ressource_type: String,
     pub id: String,
     pub role: String,
@@ -24,6 +25,7 @@ pub async fn update(
     cookies: CookieJar,
     Json(payload): Json<Vec<Input>>,
 ) -> Result<&'static str, RouterError> {
+    info!("new request!");
     let uuid = request_id.header_value().to_str()?;
     let config_read = config.read().await;
     let kratos_cookie = match cookies.get("ory_kratos_session") {

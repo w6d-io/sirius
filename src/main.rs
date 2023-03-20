@@ -32,7 +32,7 @@ type ConfigState = Arc<RwLock<SiriusConfig>>;
 pub fn app(shared_state: ConfigState) -> Router {
     info!("configuring main router");
     Router::new()
-        .route("/api/sirius/", post(update))
+        .route("/api/iam/roles", post(update))
         .with_state(shared_state)
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
 }
@@ -41,8 +41,8 @@ pub fn app(shared_state: ConfigState) -> Router {
 pub fn health(shared_state: ConfigState) -> Router {
     info!("configuring health router");
     Router::new()
-        .route("/api/sirius/alive", get(alive))
-        .route("/api/sirius/ready", get(ready))
+        .route("/alive", get(alive))
+        .route("/ready", get(ready))
         .with_state(shared_state)
 }
 
