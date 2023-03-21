@@ -47,7 +47,10 @@ pub struct SiriusConfig {
 
 impl Iam {
     async fn update(&mut self) -> Result<()> {
-        let addr = "http://".to_string() + &self.service.addr as &str + ":" + &self.service.ports.main as &str;
+        let addr = "http://".to_string()
+            + &self.service.addr as &str
+            + ":"
+            + &self.service.ports.main as &str;
         let endpoint = Endpoint::try_from(addr)?.connect_lazy();
         self.client = Some(IamClient::new(endpoint));
         Ok(())

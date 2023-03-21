@@ -24,27 +24,24 @@ impl IntoResponse for RouterError {
         match self {
             RouterError::Internal(e) => {
                 error!("{:?}", e);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "INTERNAL_SERVER_ERROR",
-                )
-                    .into_response()
+                (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR").into_response()
             }
             RouterError::StrConvert(e) => {
                 error!("{:?}, while converting str", e);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "INTERNAL_SERVER_ERROR",
-                )
+                (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR")
             }
             .into_response(),
             RouterError::Status(e) => {
                 error!("status error: {:?}", e);
                 (e, format!("http error: {:?}", e)).into_response()
-            },
+            }
             RouterError::Http(e) => {
                 error!("http error: {:?}", e);
-                (StatusCode::SERVICE_UNAVAILABLE, format!("http error: {:?}", e)).into_response()
+                (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    format!("http error: {:?}", e),
+                )
+                    .into_response()
             }
         }
     }

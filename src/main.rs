@@ -51,7 +51,7 @@ async fn make_http(
     shared_state: ConfigState,
     f: fn(ConfigState) -> Router,
     addr: String,
-) -> Result<JoinHandle<Result<(), hyper::Error>>> {
+) -> JoinHandle<Result<(), hyper::Error>> {
     //todo: add path for tlscertificate
     let handle = tokio::spawn(
         Server::bind(&addr.parse().unwrap())
@@ -59,12 +59,11 @@ async fn make_http(
             .with_graceful_shutdown(shutdown_signal()),
     );
     info!("lauching http server on: {addr}");
-    Ok(handle)
+    handle
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    std::env::set_var("RUST_LOG", "DEBUG");
     fmt()
         .with_target(false)
         .with_level(true)
@@ -81,10 +80,10 @@ async fn main() -> Result<()> {
 
     info!("statrting http router");
     let http_addr = service.addr.clone() + ":" + &service.ports.main as &str;
-    let http = make_http(shared_state.clone(), app, http_addr).await?;
+    let http = make_http(shared_state.clone(), app, http_addr).await;
 
     let health_addr = service.addr.clone() + ":" + &service.ports.health as &str;
-    let health = make_http(shared_state.clone(), health, health_addr).await?;
+    let health = make_http(shared_state.clone(), health, health_addr).await;
     let (http_critical, health_critical) = tokio::try_join!(http, health)?;
     http_critical?;
     health_critical?;

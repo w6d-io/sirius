@@ -6,12 +6,12 @@ use axum_extra::extract::cookie::CookieJar;
 use serde::Deserialize;
 use tokio::sync::RwLock;
 use tower_http::request_id::RequestId;
-use tracing::{info, error};
+use tracing::{error, info};
 
 use crate::{config::SiriusConfig, controler::update_controler, error::RouterError};
 
-#[derive(Deserialize)]
-pub struct Input {
+#[derive(Deserialize, Clone)]
+pub struct Data {
     pub email: String,
     #[serde(rename(deserialize = "type"))]
     pub ressource_type: String,
@@ -23,7 +23,7 @@ pub async fn update(
     State(config): State<Arc<RwLock<SiriusConfig>>>,
     request_id: Extension<RequestId>,
     cookies: CookieJar,
-    Json(payload): Json<Vec<Input>>,
+    Json(payload): Json<Vec<Data>>,
 ) -> Result<&'static str, RouterError> {
     info!("new request!");
     let uuid = request_id.header_value().to_str()?;
@@ -53,7 +53,7 @@ pub async fn ready(
         None => Err(anyhow!("Kratos client not initialized"))?,
     };
     let iam_service = &config.iam.service;
-    let addr = iam_service.addr.to_owned()+ "/api/iam/ready:" + &iam_service.ports.main as &str;
+    let addr = iam_service.addr.to_owned() + "/api/iam/ready:" + &iam_service.ports.main as &str;
     let response = client.client.get(addr).send().await?;
     response.error_for_status()?;
     Ok("200")
