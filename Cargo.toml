@@ -31,5 +31,6 @@ reqwest = "0.11.14"
 tonic-build = "0.8.4"
 
 [dev-dependencies]
+mime = "0.3.17"
 mockito = "1.0.0"
 

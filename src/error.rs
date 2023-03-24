@@ -19,6 +19,7 @@ pub enum RouterError {
     Status(StatusCode),
 }
 
+#[cfg(not(tarpaulin_include))]
 impl IntoResponse for RouterError {
     fn into_response(self) -> Response {
         match self {

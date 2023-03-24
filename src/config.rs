@@ -40,6 +40,7 @@ pub struct SiriusConfig {
     // pub prefix: String,
     pub service: Service,
     pub iam: Iam,
+    pub opa: String,
     pub kratos: Kratos,
     #[serde(skip)]
     path: Option<PathBuf>,
@@ -81,4 +82,35 @@ impl Config for SiriusConfig {
         *self = config;
         Ok(())
     }
+}
+
+#[cfg(test)]
+mod test_config{
+    use super::*;
+
+    #[tokio::test]
+    async fn test_update_valid(){
+        let mut config = SiriusConfig::default();
+        config.set_path("test/config.toml");
+        let res = config.update().await;
+        assert!(res.is_ok())
+    }
+
+    #[tokio::test]
+    async fn test_update_not_valid(){
+        let mut config = SiriusConfig::default();
+        config.set_path("test/not_config.toml");
+        let res = config.update().await;
+        assert!(res.is_err())
+    }
+
+    #[tokio::test]
+    async fn test_update_iam(){
+        let mut config = SiriusConfig::default();
+        config.iam.service.addr = "0.0.0.0".to_owned();
+        config.iam.service.ports.main = "8383".to_owned();
+        let res = config.iam.update().await;
+        assert!(res.is_ok())
+    }
+
 }

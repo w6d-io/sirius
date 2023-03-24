@@ -9,7 +9,6 @@ use tower_http::request_id::RequestId;
 use tracing::{error, info};
 
 use crate::{config::SiriusConfig, controler::update_controler, error::RouterError};
-
 #[derive(Deserialize, Clone)]
 pub struct Data {
     pub email: String,
@@ -26,17 +25,19 @@ pub async fn update(
     Json(payload): Json<Vec<Data>>,
 ) -> Result<&'static str, RouterError> {
     info!("new request!");
-    let uuid = request_id.header_value().to_str()?;
-    let config_read = config.read().await;
+    let request_id = request_id.header_value().to_str()?;
+    let config = config.read().await;
     let kratos_cookie = match cookies.get("ory_kratos_session") {
         Some(cookie) => cookie,
         None => {
-            error!("{uuid}: kratos cookie not found");
+            error!("{request_id}: kratos cookie not found");
             return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
         }
     };
-    let _identity = config_read.kratos.validate_session(kratos_cookie).await?;
-    update_controler(&config_read, payload, uuid).await?;
+    let identity = config.kratos.validate_session(kratos_cookie).await?;
+    info!("identity validated");
+    println!("identity validated");
+    update_controler(&config, payload, request_id, identity).await?;
     Ok("200")
 }
 
@@ -53,8 +54,138 @@ pub async fn ready(
         None => Err(anyhow!("Kratos client not initialized"))?,
     };
     let iam_service = &config.iam.service;
-    let addr = iam_service.addr.to_owned() + "/api/iam/ready:" + &iam_service.ports.main as &str;
+    let addr = format!(
+        "http://{}:{}/api/iam/ready",
+        iam_service.addr, iam_service.ports.health
+    );
     let response = client.client.get(addr).send().await?;
     response.error_for_status()?;
     Ok("200")
+}
+
+#[cfg(test)]
+mod http_router_test {
+    use std::sync::Arc;
+
+    use axum::{
+        body::Body,
+        http::{header, Method, Request, StatusCode},
+    };
+    use mockito::Server;
+    use ory_kratos_client::models::Session;
+    use serde_json::json;
+    use tokio::sync::RwLock;
+    use tower::ServiceExt;
+
+    use crate::{
+        app, health,
+        utils::test::{configure, IDENTITY},
+    };
+
+    #[tokio::test]
+    async fn test_alive() {
+        let config = configure(None, None, None).await;
+        let config = Arc::new(RwLock::new(config));
+        let app = health(config);
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::GET)
+                    .uri("/alive")
+                    .body(Body::from("200"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+    #[tokio::test]
+    async fn test_ready() {
+        let mut iam_server = Server::new_async().await;
+
+        let config = configure(None, None, Some(&iam_server)).await;
+        let iam_mock = iam_server
+            .mock("get", "/api/iam/ready")
+            .with_status(200)
+            .create_async()
+            .await;
+        let config = Arc::new(RwLock::new(config));
+        let app = health(config);
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::GET)
+                    .uri("/ready")
+                    .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header("Cookie", "ory_kratos_session=bonjour")
+                    .body(Body::from("200"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        iam_mock.assert_async().await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_update() {
+        let mut kratos_server = Server::new_async().await;
+        let mut opa_server = Server::new_async().await;
+        let config = configure(Some(&kratos_server), Some(&opa_server), None).await;
+        let body = "[".to_owned() + IDENTITY + "]";
+        let session = Session::new(
+            "bonjour".to_owned(),
+            serde_json::from_str(IDENTITY).unwrap(),
+        );
+        let kratos_mock_admin = kratos_server
+            .mock(
+                "get",
+                "/admin/identities?credentials_identifie=lol.lol@lol.io",
+            )
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(body)
+            .create_async()
+            .await;
+        let kratos_mock_session = kratos_server
+            .mock("get", "/sessions/whoami")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(serde_json::to_string(&session).unwrap())
+            .create_async()
+            .await;
+        let opa_mock = opa_server
+            .mock("post", "/")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"true"#)
+            .create_async()
+            .await;
+        let config = Arc::new(RwLock::new(config));
+        let app = app(config);
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/api/iam/roles")
+                    .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header("Cookie", "ory_kratos_session=bonjour")
+                    .body(Body::from(
+                        serde_json::to_string(&json!([{
+                          "email": "lol.lol@lol.io",
+                          "type": "project",
+                          "id": "222",
+                          "role": "contributor"
+                        }]))
+                        .unwrap(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        kratos_mock_session.assert_async().await;
+        kratos_mock_admin.assert_async().await;
+        opa_mock.assert_async().await;
+    }
 }

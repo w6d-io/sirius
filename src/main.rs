@@ -19,12 +19,13 @@ pub mod permission {
 
 mod controler;
 mod handelers;
-use handelers::shutdown_signal;
+use handelers::{shutdown_signal, fallback};
 mod router;
 use router::{alive, ready, update};
 mod config;
 use config::{SiriusConfig, CONFIG_FALLBACK};
 mod error;
+mod utils;
 
 type ConfigState = Arc<RwLock<SiriusConfig>>;
 
@@ -34,6 +35,7 @@ pub fn app(shared_state: ConfigState) -> Router {
     Router::new()
         .route("/api/iam/roles", post(update))
         .with_state(shared_state)
+        .fallback(fallback)
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
 }
 
@@ -43,6 +45,7 @@ pub fn health(shared_state: ConfigState) -> Router {
     Router::new()
         .route("/alive", get(alive))
         .route("/ready", get(ready))
+        .fallback(fallback)
         .with_state(shared_state)
 }
 
@@ -62,6 +65,7 @@ async fn make_http(
     handle
 }
 
+#[cfg(not(tarpaulin_include))]
 #[tokio::main]
 async fn main() -> Result<()> {
     fmt()
