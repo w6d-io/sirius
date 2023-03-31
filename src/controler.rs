@@ -19,7 +19,6 @@ async fn get_identity_by_mail(
     };
 
     let mut addr = format!("{}/admin/identities", client.base_path);
-    addr = addr + "?credentials_identifie=" + &data.email as &str;
     let response = client.client.get(addr).send().await?;
     response.error_for_status_ref()?;
     let json = response.json::<Vec<Identity>>().await?;
