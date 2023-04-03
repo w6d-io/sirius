@@ -19,9 +19,9 @@ pub mod permission {
 
 mod controler;
 mod handelers;
-use handelers::{shutdown_signal, fallback};
+use handelers::{fallback, shutdown_signal};
 mod router;
-use router::{alive, ready, update};
+use router::{alive, list, ready, update};
 mod config;
 use config::{SiriusConfig, CONFIG_FALLBACK};
 mod error;
@@ -33,7 +33,7 @@ type ConfigState = Arc<RwLock<SiriusConfig>>;
 pub fn app(shared_state: ConfigState) -> Router {
     info!("configuring main router");
     Router::new()
-        .route("/api/iam/roles", post(update))
+        .route("/api/iam/roles", post(update).get(list))
         .with_state(shared_state)
         .fallback(fallback)
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))

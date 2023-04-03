@@ -8,7 +8,11 @@ use tokio::sync::RwLock;
 use tower_http::request_id::RequestId;
 use tracing::{error, info};
 
-use crate::{config::SiriusConfig, controler::update_controler, error::RouterError};
+use crate::{
+    config::SiriusConfig,
+    controler::{list_controller, update_controller},
+    error::RouterError,
+};
 #[derive(Deserialize, Clone)]
 pub struct Data {
     pub email: String,
@@ -26,7 +30,7 @@ pub async fn update(
 ) -> Result<&'static str, RouterError> {
     info!("new request!");
     let request_id = request_id.header_value().to_str()?;
-    let config = config.read().await;
+    let config = config.read().await.clone();
     let kratos_cookie = match cookies.get("ory_kratos_session") {
         Some(cookie) => cookie,
         None => {
@@ -36,9 +40,31 @@ pub async fn update(
     };
     let identity = config.kratos.validate_session(kratos_cookie).await?;
     info!("identity validated");
-    println!("identity validated");
-    update_controler(&config, payload, request_id, identity).await?;
+    update_controller(config, payload, request_id, identity).await?;
     Ok("200")
+}
+
+pub async fn list(
+    State(config): State<Arc<RwLock<SiriusConfig>>>,
+    request_id: Extension<RequestId>,
+    cookies: CookieJar,
+) -> Result<String, RouterError> {
+    info!("new request!");
+    let request_id = request_id.header_value().to_str()?;
+    let config = config.read().await.clone();
+    let kratos_cookie = match cookies.get("ory_kratos_session") {
+        Some(cookie) => cookie,
+        None => {
+            error!("{request_id}: kratos cookie not found");
+            return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
+        }
+    };
+    let identity = config.kratos.validate_session(kratos_cookie).await?;
+    info!("identity validated");
+    let data = list_controller(config, request_id, identity).await?;
+    let resp = serde_json::to_string(&data)?;
+
+    Ok(resp)
 }
 
 pub async fn alive() -> Result<&'static str, RouterError> {
@@ -140,7 +166,7 @@ mod http_router_test {
         let kratos_mock_admin = kratos_server
             .mock(
                 "get",
-                "/admin/identities?credentials_identifie=lol.lol@lol.io",
+                "/admin/identities?credentials_identifier=lol.lol@lol.io",
             )
             .with_status(200)
             .with_header("content-type", "application/json")

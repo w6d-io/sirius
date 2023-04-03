@@ -9,6 +9,8 @@ use tracing::error;
 ///it convert the recevied error in a response
 #[derive(Error, Debug)]
 pub enum RouterError {
+    #[error("failed to serialize data")]
+    Serialisation(#[from] serde_json::Error),
     #[error("failed to apply identity patch")]
     Internal(#[from] anyhow::Error),
     #[error("failled to convert to string")]
@@ -23,26 +25,25 @@ pub enum RouterError {
 impl IntoResponse for RouterError {
     fn into_response(self) -> Response {
         match self {
+            RouterError::Serialisation(e) => {
+                error!("{:?}", e);
+                (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR").into_response()
+            }
             RouterError::Internal(e) => {
                 error!("{:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR").into_response()
             }
             RouterError::StrConvert(e) => {
                 error!("{:?}, while converting str", e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR")
+                (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR").into_response()
             }
-            .into_response(),
             RouterError::Status(e) => {
                 error!("status error: {:?}", e);
-                (e, format!("http error: {:?}", e)).into_response()
+                (e, format!("{:?}", e.canonical_reason())).into_response()
             }
             RouterError::Http(e) => {
                 error!("http error: {:?}", e);
-                (
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    format!("http error: {:?}", e),
-                )
-                    .into_response()
+                (StatusCode::SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE").into_response()
             }
         }
     }

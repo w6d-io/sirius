@@ -1,7 +1,7 @@
-use tokio::signal;
-use tracing::info;
 use axum::http::{StatusCode, Uri};
+use tokio::signal;
 use tracing::error;
+use tracing::info;
 
 #[cfg(not(tarpaulin_include))]
 ///handle the shutdown signal

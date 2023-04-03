@@ -85,11 +85,11 @@ impl Config for SiriusConfig {
 }
 
 #[cfg(test)]
-mod test_config{
+mod test_config {
     use super::*;
 
     #[tokio::test]
-    async fn test_update_valid(){
+    async fn test_update_valid() {
         let mut config = SiriusConfig::default();
         config.set_path("test/config.toml");
         let res = config.update().await;
@@ -97,7 +97,7 @@ mod test_config{
     }
 
     #[tokio::test]
-    async fn test_update_not_valid(){
+    async fn test_update_not_valid() {
         let mut config = SiriusConfig::default();
         config.set_path("test/not_config.toml");
         let res = config.update().await;
@@ -105,12 +105,11 @@ mod test_config{
     }
 
     #[tokio::test]
-    async fn test_update_iam(){
+    async fn test_update_iam() {
         let mut config = SiriusConfig::default();
         config.iam.service.addr = "0.0.0.0".to_owned();
         config.iam.service.ports.main = "8383".to_owned();
         let res = config.iam.update().await;
         assert!(res.is_ok())
     }
-
 }

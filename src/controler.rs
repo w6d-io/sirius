@@ -1,7 +1,11 @@
+use std::{collections::BTreeSet, sync::Arc};
+
 use anyhow::{anyhow, bail, Result};
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
-use ory_kratos_client::models::Identity;
+use ory_kratos_client::{
+    apis::{configuration::Configuration, identity_api::get_identity},
+    models::Identity,
+};
+use tokio::task::JoinSet;
 use tonic::Request;
 use tracing::{debug, error};
 
@@ -19,6 +23,7 @@ async fn get_identity_by_mail(
     };
 
     let mut addr = format!("{}/admin/identities", client.base_path);
+    addr = addr + "?credentials_identifier=" + &data.email as &str;
     let response = client.client.get(addr).send().await?;
     response.error_for_status_ref()?;
     let json = response.json::<Vec<Identity>>().await?;
@@ -30,13 +35,13 @@ async fn get_identity_by_mail(
     Ok(identity)
 }
 
-async fn send_to_iam(config: &SiriusConfig, data: &Data, request_id: &str) -> Result<()> {
+async fn send_to_iam(config: Arc<SiriusConfig>, data: Data, request_id: String) -> Result<()> {
     let mut client = config
         .iam
         .client
         .clone()
         .ok_or_else(|| anyhow!("{request_id}: Iam client not initialized!"))?;
-    let identity = get_identity_by_mail(config, data, request_id).await?;
+    let identity = get_identity_by_mail(&config, &data, &request_id).await?;
     let role = "\"".to_owned() + &data.role as &str + "\"";
     let request = Request::new(Input {
         id: identity.id,
@@ -49,26 +54,103 @@ async fn send_to_iam(config: &SiriusConfig, data: &Data, request_id: &str) -> Re
 }
 
 ///send a call to iam to update an identity metadata
-pub async fn update_controler(
-    config: &SiriusConfig,
+pub async fn update_controller(
+    config: SiriusConfig,
     payload: Vec<Data>,
     request_id: &str,
     identity: Identity,
 ) -> Result<()> {
-    let mut futures = FuturesUnordered::new();
+    let mut handles = JoinSet::new();
+    let config = Arc::new(config);
     for input in payload.iter() {
-        if !validate_roles(config, &identity, &input.id, request_id, "api/iam").await? {
+        if !validate_roles(&config, &identity, &input.id, request_id, "api/iam").await? {
             Err(anyhow!("Invalid role!"))?;
         }
-        futures.push(send_to_iam(config, input, request_id));
+        handles.spawn(send_to_iam(
+            config.clone(),
+            input.to_owned(),
+            request_id.to_owned(),
+        ));
     }
-    while let Some(res) = futures.next().await {
-        if let Err(e) = res {
-            error!("{request_id}: one or more request failed: {e}");
-            bail!("{request_id}: one or more request failed: {e}")
-        }
+    while let Some(future) = handles.join_next().await {
+        future??;
     }
     Ok(())
+}
+
+async fn get_scope_project(
+    client: Arc<Configuration>,
+    uuid: String,
+    request_id: String,
+) -> Result<BTreeSet<String>> {
+    let mut projects = BTreeSet::new();
+    let identity = get_identity(&client, &uuid, None).await?;
+    match identity.metadata_admin {
+        Some(metadata) => {
+            if let Some(project) = metadata.get("project") {
+                let project = project
+                    .as_array()
+                    .ok_or_else(|| anyhow!("{request_id}: This should be an array!"))?;
+                for id in project {
+                    let id = id
+                        .as_str()
+                        .ok_or_else(|| anyhow!("{request_id}: Not a string!"))?;
+                    projects.insert(id.to_owned());
+                }
+            }
+        }
+        None => {
+            error!("{request_id}: no metadata in this user!");
+            bail!("{request_id}: no metadata in this user!")
+        }
+    };
+    Ok(projects)
+}
+
+pub async fn list_controller(
+    config: SiriusConfig,
+    request_id: &str,
+    identity: Identity,
+) -> Result<BTreeSet<String>> {
+    let client = match &config.kratos.client {
+        Some(client) => client,
+        None => bail!("{request_id}: kratos client not initialized"),
+    };
+    let client = Arc::new(client.to_owned());
+    let mut projects = BTreeSet::new();
+    let metadata = match identity.metadata_admin {
+        Some(metadata) => metadata,
+        None => {
+            error!("{request_id}: no metadata in this user!");
+            bail!("{request_id}: no metadata in this user!")
+        }
+    };
+    if let Some(project) = metadata.get("project") {
+        let project = project
+            .as_object()
+            .ok_or_else(|| anyhow!("{request_id}: This should be a map!"))?;
+        for key in project.keys() {
+            projects.insert(key.to_owned());
+        }
+    }
+    if let Some(scope) = metadata.get("scope") {
+        let scopes = scope.as_object().expect("this should be a map!");
+        if !scopes.is_empty() {
+            let mut handles = JoinSet::new();
+            for (uuid, _) in scopes.iter() {
+                handles.spawn(get_scope_project(
+                    client.clone(),
+                    uuid.to_owned(),
+                    request_id.to_owned(),
+                ));
+            }
+            while let Some(future) = handles.join_next().await {
+                let mut scopes_proj = future??;
+                projects.append(&mut scopes_proj);
+            }
+        }
+    }
+    Ok(projects)
 }
 
 #[cfg(test)]
@@ -97,7 +179,7 @@ pub mod test_controler {
         let mock_kratos = kratos_server
             .mock(
                 "GET",
-                "/admin/identities?credentials_identifie=lol.lol@lol.io",
+                "/admin/identities?credentials_identifier=lol.lol@lol.io",
             )
             .with_status(200)
             .with_header("content-type", "application/json")
@@ -116,21 +198,22 @@ pub mod test_controler {
             id: "222".to_owned(),
             role: "admin".to_owned(),
         };
-        let uuid = "1";
+        let uuid = "1".to_owned();
         let mut server = MockServer::new_async().await;
         let config = configure(Some(&server), None, None).await;
+        let config = Arc::new(config);
         let body = "[".to_owned() + IDENTITY + "]";
         let mock = server
             .mock(
                 "GET",
-                "/admin/identities?credentials_identifie=lol.lol@lol.io",
+                "/admin/identities?credentials_identifier=lol.lol@lol.io",
             )
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(body)
             .create_async()
             .await;
-        send_to_iam(&config, &data, uuid).await.unwrap();
+        send_to_iam(config, data, uuid).await.unwrap();
         mock.assert_async().await;
     }
 
@@ -150,7 +233,7 @@ pub mod test_controler {
         let kratos_mock = kratos_server
             .mock(
                 "get",
-                "/admin/identities?credentials_identifie=lol.lol@lol.io",
+                "/admin/identities?credentials_identifier=lol.lol@lol.io",
             )
             .with_status(200)
             .with_header("content-type", "application/json")
@@ -165,7 +248,7 @@ pub mod test_controler {
             .create_async()
             .await;
         let identity = serde_json::from_str(IDENTITY).unwrap();
-        update_controler(&config, vec![data], uuid, identity)
+        update_controller(config, vec![data], uuid, identity)
             .await
             .unwrap();
         kratos_mock.assert_async().await;
@@ -188,7 +271,7 @@ pub mod test_controler {
         let kratos_mock = kratos_server
             .mock(
                 "GET",
-                "/admin/identities?credentials_identifie=lol.lol@lol.io",
+                "/admin/identities?credentials_identifier=lol.lol@lol.io",
             )
             .with_status(200)
             .with_header("content-type", "application/json")
@@ -206,7 +289,7 @@ pub mod test_controler {
             .await;
 
         let identity = serde_json::from_str(IDENTITY).unwrap();
-        update_controler(&config, vec![data.clone(), data], uuid, identity)
+        update_controller(config, vec![data.clone(), data], uuid, identity)
             .await
             .unwrap();
         kratos_mock.assert_async().await;
