@@ -1,0 +1,241 @@
+use std::sync::Arc;
+
+use anyhow::{anyhow, bail, Ok, Result};
+use ory_kratos_client::{
+    apis::{configuration::Configuration, identity_api::get_identity},
+    models::Identity,
+};
+use tokio::task::JoinSet;
+use tonic::Request;
+use tracing::debug;
+
+use crate::{
+    config::SiriusConfig,
+    permission::{Input, Mode},
+    router::{Data, IDType},
+    utils::opa::validate_roles,
+};
+
+///get an identities form kratos by mail
+async fn get_identity_by_mail(
+    client: &Configuration,
+    id: &str,
+    request_id: &str,
+) -> Result<Identity> {
+    let mut addr = format!("{}/admin/identities", client.base_path);
+    addr = addr + "?credentials_identifier=" + id;
+    let response = client.client.get(addr).send().await?;
+    response.error_for_status_ref()?;
+    let json = response.json::<Vec<Identity>>().await?;
+    let identity = match json.get(0) {
+        Some(identity) => identity.to_owned(),
+        None => bail!("{request_id}: no identity found for {}", id),
+    };
+    debug!("{:?}", identity);
+    Ok(identity)
+}
+
+async fn get_kratos_identity(
+    config: &SiriusConfig,
+    id: &IDType,
+    request_id: &str,
+) -> Result<Identity> {
+    let client = match &config.kratos.client {
+        Some(client) => client,
+        None => bail!("{request_id}: kratos client not initialized"),
+    };
+    let identity = match id {
+        IDType::Email(id) => get_identity_by_mail(client, id.as_str(), request_id).await?,
+        IDType::ID(ref id) => get_identity(client, &id.to_string(), None).await?,
+    };
+    Ok(identity)
+}
+
+async fn send_to_iam(
+    config: Arc<SiriusConfig>,
+    data: Data,
+    request_id: String,
+) -> Result<Identity> {
+    let mut client = config
+        .iam
+        .client
+        .clone()
+        .ok_or_else(|| anyhow!("{request_id}: Iam client not initialized!"))?;
+    let identity = get_kratos_identity(&config, &data.id, &request_id).await?;
+    println!("kratos identity obtained!");
+    let value = data.value.to_string();
+    println!("{value}");
+
+    let mut input = Input {
+        id: identity.id.clone(),
+        perm_type: data.ressource_type.clone(),
+        resource: data.ressource_id,
+        value,
+        ..Default::default()
+    };
+    input.set_mode(Mode::Meta);
+    let request = Request::new(input);
+    client.add_permission(request).await?;
+    Ok(identity)
+}
+
+///send a call to iam to update an identity metadata
+pub async fn update_controller(
+    config: Arc<SiriusConfig>,
+    payload: Vec<Data>,
+    request_id: &str,
+    identity: Identity,
+) -> Result<Vec<Identity>> {
+    let mut handles = JoinSet::new();
+    for data in payload.iter() {
+        if !validate_roles(&config, &identity, &data.ressource_id, request_id, "api/iam").await? {
+            Err(anyhow!("Invalid role!"))?;
+        }
+        println!("role validated!");
+        handles.spawn(send_to_iam(
+            config.clone(),
+            data.to_owned(),
+            request_id.to_owned(),
+        ));
+    }
+    let mut ret = Vec::new();
+    while let Some(future) = handles.join_next().await {
+        ret.push(future??);
+    }
+    Ok(ret)
+}
+
+#[cfg(test)]
+pub mod test_controler {
+    use mockito::Server as MockServer;
+    use serde_email::Email;
+    use serde_json::Value;
+    use super::*;
+
+    use crate::{
+        router::Data,
+        utils::test::{configure, IDENTITY},
+    };
+
+    #[tokio::test]
+    async fn test_get_kratos_identity_email() {
+        let id = IDType::Email(Email::new("lol.lol@lol.io".to_owned()).unwrap());
+        let uuid = "1";
+        let mut kratos_server = MockServer::new_async().await;
+        let config = configure(Some(&kratos_server), None, None).await;
+        let body = "[".to_owned() + IDENTITY + "]";
+        let mock_kratos = kratos_server
+            .mock("GET", "/admin/identities?credentials_identifier=lol.lol@lol.io")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(body)
+            .create_async()
+            .await;
+        get_kratos_identity(&config, &id, uuid)
+            .await
+            .unwrap();
+        mock_kratos.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_send_to_iam_email() {
+        let data = Data {
+            id: IDType::Email(Email::new("lol.lol@lol.io".to_owned()).unwrap()),
+            ressource_type: "test".to_owned(),
+            ressource_id: "222".to_owned(),
+            value: Value::Array(vec![Value::String("admin".to_owned())]),
+        };
+        let uuid = "1".to_owned();
+        let mut server = MockServer::new_async().await;
+        let config = configure(Some(&server), None, None).await;
+        let config = Arc::new(config);
+        let body = "[".to_owned() + IDENTITY + "]";
+        let mock = server
+            .mock("GET", "/admin/identities?credentials_identifier=lol.lol@lol.io")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(body)
+            .create_async()
+            .await;
+        send_to_iam(config, data, uuid).await.unwrap();
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_update_controler_simple() {
+        let data = Data {
+            id: IDType::Email(Email::new("lol.lol@lol.io".to_owned()).unwrap()),
+            ressource_type: "test".to_owned(),
+            ressource_id: "222".to_owned(),
+            value: Value::Array(vec![Value::String("admin".to_owned())]),
+        };
+        let uuid = "1";
+        let mut kratos_server = MockServer::new_async().await;
+        let mut opa_server = MockServer::new_async().await;
+        let config = configure(Some(&kratos_server), Some(&opa_server), None).await;
+        let body = "[".to_owned() + IDENTITY + "]";
+        let kratos_mock = kratos_server
+            .mock("get", "/admin/identities?credentials_identifier=lol.lol@lol.io")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(body)
+            .create_async()
+            .await;
+        let opa_mock = opa_server
+            .mock("post", "/")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"true"#)
+            .create_async()
+            .await;
+        let identity = serde_json::from_str(IDENTITY).unwrap();
+        update_controller(Arc::new(config), vec![data], uuid, identity)
+            .await
+            .unwrap();
+        kratos_mock.assert_async().await;
+        opa_mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_update_controler_multiple() {
+        let data = Data {
+            id: IDType::Email(Email::new("lol.lol@lol.io".to_owned()).unwrap()),
+            ressource_type: "test".to_owned(),
+            ressource_id: "222".to_owned(),
+            value: Value::String("admin".to_owned()),
+        };
+        let uuid = "1";
+        let mut kratos_server = MockServer::new_async().await;
+        let mut opa_server = MockServer::new_async().await;
+        let config = configure(Some(&kratos_server), Some(&opa_server), None).await;
+        let body = "[".to_owned() + IDENTITY + "]";
+        let kratos_mock = kratos_server
+            .mock("GET", "/admin/identities?credentials_identifier=lol.lol@lol.io")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(body)
+            .expect(2)
+            .create_async()
+            .await;
+        let opa_mock = opa_server
+            .mock("post", "/")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"true"#)
+            .expect(2)
+            .create_async()
+            .await;
+
+        let identity = serde_json::from_str(IDENTITY).unwrap();
+        update_controller(
+            Arc::new(config),
+            vec![data.clone(), data],
+            uuid,
+            identity,
+        )
+        .await
+        .unwrap();
+        kratos_mock.assert_async().await;
+        opa_mock.assert_async().await;
+    }
+}

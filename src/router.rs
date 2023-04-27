@@ -1,28 +1,54 @@
-use std::sync::Arc;
+use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use anyhow::anyhow;
 use axum::{extract::State, http::StatusCode, response::Result, Extension, Json};
 use axum_extra::extract::cookie::CookieJar;
 use serde::Deserialize;
+use serde_json::Value;
+use serde_email::Email;
 use tokio::sync::RwLock;
 use tower_http::request_id::RequestId;
 use tracing::{error, info};
+use uuid::Uuid;
 
 use crate::{
     config::SiriusConfig,
-    controler::{list_controller, update_controller},
+    controller::{
+        list::{list_controller, list_project_controller},
+        update::update_controller,
+        sync::{SyncMode, sync_user},
+    },
     error::RouterError,
 };
+
 #[derive(Deserialize, Clone)]
-pub struct Data {
-    pub email: String,
-    #[serde(rename(deserialize = "type"))]
-    pub ressource_type: String,
-    pub id: String,
-    pub role: String,
+#[serde(untagged)]
+pub enum IDType{
+    ID(Uuid),
+    Email(Email)
 }
 
-pub async fn update(
+impl Display for IDType{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IDType::Email(ref id) => write!(f, "{}", id.as_str()),
+            IDType::ID(ref id) => write!(f,"{}", id)
+        }
+    }
+
+}
+
+#[derive(Deserialize, Clone)]
+pub struct Data {
+    //id :can be the email or the uuid depending of the endpoint
+    pub id: IDType,
+    #[serde(rename(deserialize = "type"))]
+    pub ressource_type: String,
+    pub ressource_id: String,
+    pub value: Value,
+}
+
+pub async fn update_organisaion(
     State(config): State<Arc<RwLock<SiriusConfig>>>,
     request_id: Extension<RequestId>,
     cookies: CookieJar,
@@ -31,6 +57,7 @@ pub async fn update(
     info!("new request!");
     let request_id = request_id.header_value().to_str()?;
     let config = config.read().await.clone();
+    let config = Arc::new(config);
     let kratos_cookie = match cookies.get("ory_kratos_session") {
         Some(cookie) => cookie,
         None => {
@@ -44,7 +71,67 @@ pub async fn update(
     Ok("200")
 }
 
-pub async fn list(
+pub async fn update_scopes(
+    State(config): State<Arc<RwLock<SiriusConfig>>>,
+    request_id: Extension<RequestId>,
+    cookies: CookieJar,
+    Json(payload): Json<Vec<Data>>,
+) -> Result<&'static str, RouterError> {
+    info!("new request!");
+    let request_id = request_id.header_value().to_str()?.to_owned();
+    let config = config.read().await.clone();
+    let config = Arc::new(config);
+    let kratos_cookie = match cookies.get("ory_kratos_session") {
+        Some(cookie) => cookie,
+        None => {
+            error!("{request_id}: kratos cookie not found");
+            return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
+        }
+    };
+    let identity = config.kratos.validate_session(kratos_cookie).await?;
+    info!("identity validated");
+    let mut users = HashMap::new();
+    for data in &payload {
+        if data.ressource_type == "user" {
+            users.insert(data.id.to_string(), (data.ressource_id.to_owned(), data.value.clone()));
+        }
+    }
+    let scopes = update_controller(config.clone(), payload, &request_id, identity).await?;
+    info!("scope updated");
+    let sync_mode = if !users.is_empty() {
+        SyncMode::User(users)
+    } else {
+        SyncMode::Project
+    };
+    info!("lauching user sync");
+    tokio::spawn(sync_user(config, scopes, request_id.clone(), sync_mode));
+    Ok("200")
+}
+
+pub async fn update_projects(
+    State(config): State<Arc<RwLock<SiriusConfig>>>,
+    request_id: Extension<RequestId>,
+    cookies: CookieJar,
+    Json(payload): Json<Vec<Data>>,
+) -> Result<&'static str, RouterError> {
+    info!("new request!");
+    let request_id = request_id.header_value().to_str()?;
+    let config = config.read().await.clone();
+    let config = Arc::new(config);
+    let kratos_cookie = match cookies.get("ory_kratos_session") {
+        Some(cookie) => cookie,
+        None => {
+            error!("{request_id}: kratos cookie not found");
+            return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
+        }
+    };
+    let identity = config.kratos.validate_session(kratos_cookie).await?;
+    info!("identity validated");
+    update_controller(config, payload, request_id, identity).await?;
+    Ok("200")
+}
+
+pub async fn list_projects(
     State(config): State<Arc<RwLock<SiriusConfig>>>,
     request_id: Extension<RequestId>,
     cookies: CookieJar,
@@ -61,7 +148,53 @@ pub async fn list(
     };
     let identity = config.kratos.validate_session(kratos_cookie).await?;
     info!("identity validated");
-    let data = list_controller(config, request_id, identity).await?;
+    let data = list_project_controller(request_id, identity).await?;
+    let resp = serde_json::to_string(&data)?;
+
+    Ok(resp)
+}
+
+pub async fn list_scopes(
+    State(config): State<Arc<RwLock<SiriusConfig>>>,
+    request_id: Extension<RequestId>,
+    cookies: CookieJar,
+) -> Result<String, RouterError> {
+    info!("new request!");
+    let request_id = request_id.header_value().to_str()?;
+    let config = config.read().await.clone();
+    let kratos_cookie = match cookies.get("ory_kratos_session") {
+        Some(cookie) => cookie,
+        None => {
+            error!("{request_id}: kratos cookie not found");
+            return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
+        }
+    };
+    let identity = config.kratos.validate_session(kratos_cookie).await?;
+    info!("identity validated");
+    let data = list_controller(request_id, identity, "scope").await?;
+    let resp = serde_json::to_string(&data)?;
+
+    Ok(resp)
+}
+
+pub async fn list_orga(
+    State(config): State<Arc<RwLock<SiriusConfig>>>,
+    request_id: Extension<RequestId>,
+    cookies: CookieJar,
+) -> Result<String, RouterError> {
+    info!("new request!");
+    let request_id = request_id.header_value().to_str()?;
+    let config = config.read().await.clone();
+    let kratos_cookie = match cookies.get("ory_kratos_session") {
+        Some(cookie) => cookie,
+        None => {
+            error!("{request_id}: kratos cookie not found");
+            return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
+        }
+    };
+    let identity = config.kratos.validate_session(kratos_cookie).await?;
+    info!("identity validated");
+    let data = list_controller(request_id, identity, "organisation").await?;
     let resp = serde_json::to_string(&data)?;
 
     Ok(resp)
@@ -154,7 +287,7 @@ mod http_router_test {
     }
 
     #[tokio::test]
-    async fn test_update() {
+    async fn test_update_users() {
         let mut kratos_server = Server::new_async().await;
         let mut opa_server = Server::new_async().await;
         let config = configure(Some(&kratos_server), Some(&opa_server), None).await;
@@ -193,15 +326,15 @@ mod http_router_test {
             .oneshot(
                 Request::builder()
                     .method(Method::POST)
-                    .uri("/api/iam/roles")
+                    .uri("/api/iam/project")
                     .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .header("Cookie", "ory_kratos_session=bonjour")
                     .body(Body::from(
                         serde_json::to_string(&json!([{
-                          "email": "lol.lol@lol.io",
+                          "id": "lol.lol@lol.io",
                           "type": "project",
-                          "id": "222",
-                          "role": "contributor"
+                          "ressource_id": "222",
+                          "value": ["contributor"]
                         }]))
                         .unwrap(),
                     ))
@@ -209,9 +342,72 @@ mod http_router_test {
             )
             .await
             .unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
         kratos_mock_session.assert_async().await;
         kratos_mock_admin.assert_async().await;
         opa_mock.assert_async().await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_update_scope() {
+        let mut kratos_server = Server::new_async().await;
+        let mut opa_server = Server::new_async().await;
+        let config = configure(Some(&kratos_server), Some(&opa_server), None).await;
+        let session = Session::new(
+            "bonjour".to_owned(),
+            serde_json::from_str(IDENTITY).unwrap(),
+        );
+        let kratos_mock_admin = kratos_server
+            .mock(
+                "get",
+                "/admin/identities/9f425a8d-7efc-4768-8f23-7647a74fdf13",
+            )
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(IDENTITY)
+            .create_async()
+            .await;
+        let kratos_mock_session = kratos_server
+            .mock("get", "/sessions/whoami")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(serde_json::to_string(&session).unwrap())
+            .create_async()
+            .await;
+        let opa_mock = opa_server
+            .mock("post", "/")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"true"#)
+            .create_async()
+            .await;
+        let config = Arc::new(RwLock::new(config));
+        let app = app(config);
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/api/iam/scope")
+                    .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header("Cookie", "ory_kratos_session=bonjour")
+                    .body(Body::from(
+                        serde_json::to_string(&json!([{
+                            //uuid from kratos exemple
+                          "id": "9f425a8d-7efc-4768-8f23-7647a74fdf13",
+                          "type": "user",
+                          "ressource_id": "222",
+                          "value": ["contributor"]
+                        }]))
+                        .unwrap(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        kratos_mock_session.assert_async().await;
+        kratos_mock_admin.assert_async().await;
+        opa_mock.assert_async().await;
+        println!("{:#?}", response);
+        assert_eq!(response.status(), StatusCode::OK);
     }
 }

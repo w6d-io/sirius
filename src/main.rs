@@ -17,13 +17,17 @@ pub mod permission {
     tonic::include_proto!("permission");
 }
 
-mod controler;
+mod controller;
 mod handelers;
 use handelers::{fallback, shutdown_signal};
 mod router;
-use router::{alive, list, ready, update};
+use router::{
+    alive, list_projects, list_scopes, ready, update_organisaion, update_projects, update_scopes,
+};
 mod config;
 use config::{SiriusConfig, CONFIG_FALLBACK};
+
+use crate::router::list_orga;
 mod error;
 mod utils;
 
@@ -32,8 +36,17 @@ type ConfigState = Arc<RwLock<SiriusConfig>>;
 ///main router config
 pub fn app(shared_state: ConfigState) -> Router {
     info!("configuring main router");
+    let project_route = Router::new().route("/", post(update_projects).get(list_projects));
+    let list_scopes = Router::new().route("/", post(update_scopes).get(list_scopes));
+    let list_orga = Router::new().route("/", post(update_organisaion).get(list_orga));
+
+    let api_route = Router::new()
+        .nest("/project", project_route)
+        .nest("/scope", list_scopes)
+        .nest("/organisation", list_orga);
+
     Router::new()
-        .route("/api/iam/roles", post(update).get(list))
+        .nest("/api/iam", api_route)
         .with_state(shared_state)
         .fallback(fallback)
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
