@@ -17,23 +17,38 @@ pub mod permission {
     tonic::include_proto!("permission");
 }
 
-mod controler;
+mod controller;
 mod handelers;
-use handelers::shutdown_signal;
+use handelers::{fallback, shutdown_signal};
 mod router;
-use router::{alive, ready, update};
+use router::{
+    alive, list_projects, list_scopes, ready, update_organisaion, update_projects, update_scopes,
+};
 mod config;
 use config::{SiriusConfig, CONFIG_FALLBACK};
+
+use crate::router::list_orga;
 mod error;
+mod utils;
 
 type ConfigState = Arc<RwLock<SiriusConfig>>;
 
 ///main router config
 pub fn app(shared_state: ConfigState) -> Router {
     info!("configuring main router");
+    let project_route = Router::new().route("/", post(update_projects).get(list_projects));
+    let list_scopes = Router::new().route("/", post(update_scopes).get(list_scopes));
+    let list_orga = Router::new().route("/", post(update_organisaion).get(list_orga));
+
+    let api_route = Router::new()
+        .nest("/project", project_route)
+        .nest("/scope", list_scopes)
+        .nest("/organisation", list_orga);
+
     Router::new()
-        .route("/api/sirius/", post(update))
+        .nest("/api/iam", api_route)
         .with_state(shared_state)
+        .fallback(fallback)
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
 }
 
@@ -41,8 +56,9 @@ pub fn app(shared_state: ConfigState) -> Router {
 pub fn health(shared_state: ConfigState) -> Router {
     info!("configuring health router");
     Router::new()
-        .route("/api/sirius/alive", get(alive))
-        .route("/api/sirius/ready", get(ready))
+        .route("/alive", get(alive))
+        .route("/ready", get(ready))
+        .fallback(fallback)
         .with_state(shared_state)
 }
 
@@ -51,7 +67,7 @@ async fn make_http(
     shared_state: ConfigState,
     f: fn(ConfigState) -> Router,
     addr: String,
-) -> Result<JoinHandle<Result<(), hyper::Error>>> {
+) -> JoinHandle<Result<(), hyper::Error>> {
     //todo: add path for tlscertificate
     let handle = tokio::spawn(
         Server::bind(&addr.parse().unwrap())
@@ -59,12 +75,12 @@ async fn make_http(
             .with_graceful_shutdown(shutdown_signal()),
     );
     info!("lauching http server on: {addr}");
-    Ok(handle)
+    handle
 }
 
+#[cfg(not(tarpaulin_include))]
 #[tokio::main]
 async fn main() -> Result<()> {
-    std::env::set_var("RUST_LOG", "DEBUG");
     fmt()
         .with_target(false)
         .with_level(true)
@@ -81,10 +97,10 @@ async fn main() -> Result<()> {
 
     info!("statrting http router");
     let http_addr = service.addr.clone() + ":" + &service.ports.main as &str;
-    let http = make_http(shared_state.clone(), app, http_addr).await?;
+    let http = make_http(shared_state.clone(), app, http_addr).await;
 
     let health_addr = service.addr.clone() + ":" + &service.ports.health as &str;
-    let health = make_http(shared_state.clone(), health, health_addr).await?;
+    let health = make_http(shared_state.clone(), health, health_addr).await;
     let (http_critical, health_critical) = tokio::try_join!(http, health)?;
     http_critical?;
     health_critical?;
