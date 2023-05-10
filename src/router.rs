@@ -410,4 +410,67 @@ mod http_router_test {
         println!("{:#?}", response);
         assert_eq!(response.status(), StatusCode::OK);
     }
+
+    #[tokio::test]
+    async fn test_update_orga() {
+        let mut kratos_server = Server::new_async().await;
+        let mut opa_server = Server::new_async().await;
+        let config = configure(Some(&kratos_server), Some(&opa_server), None).await;
+        let session = Session::new(
+            "bonjour".to_owned(),
+            serde_json::from_str(IDENTITY).unwrap(),
+        );
+        let kratos_mock_admin = kratos_server
+            .mock(
+                "get",
+                "/admin/identities/9f425a8d-7efc-4768-8f23-7647a74fdf13",
+            )
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(IDENTITY)
+            .create_async()
+            .await;
+        let kratos_mock_session = kratos_server
+            .mock("get", "/sessions/whoami")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(serde_json::to_string(&session).unwrap())
+            .create_async()
+            .await;
+        let opa_mock = opa_server
+            .mock("post", "/")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"true"#)
+            .create_async()
+            .await;
+        let config = Arc::new(RwLock::new(config));
+        let app = app(config);
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/api/iam/organisation")
+                    .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header("Cookie", "ory_kratos_session=bonjour")
+                    .body(Body::from(
+                        serde_json::to_string(&json!([{
+                            //uuid from kratos exemple
+                          "id": "9f425a8d-7efc-4768-8f23-7647a74fdf13",
+                          "type": "user",
+                          "ressource_id": "222",
+                          "value": ["contributor"]
+                        }]))
+                        .unwrap(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        kratos_mock_session.assert_async().await;
+        kratos_mock_admin.assert_async().await;
+        opa_mock.assert_async().await;
+        println!("{:#?}", response);
+        assert_eq!(response.status(), StatusCode::OK);
+    }
 }
