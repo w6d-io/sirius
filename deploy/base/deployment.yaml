@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sirius
+spec:
+  replicas: 1
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        linkerd.io/inject: enabled
+        vault.security.banzaicloud.io/vault-addr: http://vault.vault:8200
+        vault.security.banzaicloud.io/vault-role: sirius
+        vault.security.banzaicloud.io/vault-skip-verify: "true"
+    spec:
+      containers:
+        - env:
+            - name: RUST_LOG
+              value: debug
+            - name: CONFIG
+              value: /data/config/config.toml
+          image: w6dio/sirius:v0.2.0
+          imagePullPolicy: IfNotPresent
+          name: sirius
+          ports:
+            - containerPort: 8080
+              name: sirius
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /data/config
+              name: config
+      nodeSelector:
+        role: appli
+      serviceAccountName: sirius
+      tolerations:
+        - effect: NoSchedule
+          key: dedicated
+          operator: Equal
+          value: appli
+      volumes:
+        - configMap:
+            defaultMode: 420
+            name: sirius-config
+          name: config

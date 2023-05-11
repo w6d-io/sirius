@@ -1,0 +1,20 @@
+opa = "http://127.0.0.1:8000"
+
+[kratos]
+addr = "http://kratos.kratos:4434"
+
+[service]
+addr = "0.0.0.0"
+ports.main = "8080"
+ports.health = "2040"
+
+[iam.service]
+addr = "iam"
+ports.main = "5050"
+ports.health = "1040"
+
+[kafka.producers]
+notif.broker = "test"
+notif.topic = "notif"
+error.broker = "test"
+error.topic = "error"
