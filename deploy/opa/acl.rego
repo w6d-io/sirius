@@ -18,8 +18,11 @@ main if {
 # check end point right
 matchUrl if {
 	some k
-	api_attributes = {"get": [
-		{"key": "api/iam/roles", "value": ["admin", "owner"]},
+	api_attributes = {"post": [
+		{"key": "api/iam/project/", "value": ["admin", "owner"]},
+		{"key": "api/iam/scope/", "value": ["admin", "owner"]},
+		{"key": "api/iam/organisation/", "value": ["admin", "owner"]},
+
 	]}
 
 	uri_list := api_attributes[input.method]
