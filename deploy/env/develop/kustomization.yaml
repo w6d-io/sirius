@@ -1,5 +1,6 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+
 labels:
   - includeSelectors: true
     pairs:
@@ -7,15 +8,15 @@ labels:
 
 namespace: w6d-bkd
 
-patches:
-- path: opa/sidecar.yaml
-  target:
-    kind: Deployment
-    name: sirius
-    group: apps
-    version: v1
-
-
 resources:
-- base
-- opa
+- ingress.yaml
+- ../../base
+- ../../opa
+
+patches:
+  - path: sidecar.yaml
+    target:
+      kind: Deployment
+      name: sirius
+      group: apps
+      version: v1
