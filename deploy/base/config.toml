@@ -13,11 +13,8 @@ addr = "iam"
 ports.main = "5050"
 ports.health = "1040"
 
-[kafka]
-service = "rpk-0.rpk.kafka.svc.cluster.local:9092,rpk-1.rpk.kafka.svc.cluster.local:9092,rpk-2.rpk.kafka.svc.cluster.local:9092"
-
 [kafka.producers]
-notif.broker = "test"
+notif.broker = "rpk-0.rpk.kafka.svc.cluster.local:9092,rpk-1.rpk.kafka.svc.cluster.local:9092,rpk-2.rpk.kafka.svc.cluster.local:9092"
 notif.topic = "notif"
-error.broker = "test"
+error.broker = "rpk-0.rpk.kafka.svc.cluster.local:9092,rpk-1.rpk.kafka.svc.cluster.local:9092,rpk-2.rpk.kafka.svc.cluster.local:9092"
 error.topic = "error"
