@@ -33,6 +33,24 @@ spec:
           volumeMounts:
             - mountPath: /data/config
               name: config
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /ready
+              port: 2040
+              scheme: HTTP
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /alive
+              port: 2040
+              scheme: HTTP
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
       nodeSelector:
         role: appli
       serviceAccountName: sirius
