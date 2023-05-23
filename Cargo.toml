@@ -19,14 +19,14 @@ figment = "0.10.*"
 tracing = { version = "0.1.37", features = ["log"] }
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 hyper = "0.14.23"
-ory-kratos-client = "0.11.1"
+ory-kratos-client = "0.13.1"
 futures = "0.3.26"
 thiserror = "1.0.38"
 axum-extra = { version = "0.7.0", features = ["cookie"] }
 tonic = "0.9.*"
 prost = "0.11.8"
 reqwest = "0.11.14"
-serde-email = "1.3.0"
+serde-email = "1.5.0"
 uuid = { version = "1.3.1", features = ["serde"] }
 
 [dependencies.libkafka]
