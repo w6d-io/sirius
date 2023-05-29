@@ -4,8 +4,8 @@ use anyhow::anyhow;
 use axum::{extract::State, http::StatusCode, response::Result, Extension, Json};
 use axum_extra::extract::cookie::CookieJar;
 use serde::Deserialize;
-use serde_json::Value;
 use serde_email::Email;
+use serde_json::Value;
 use tokio::sync::RwLock;
 use tower_http::request_id::RequestId;
 use tracing::{error, info};
@@ -15,27 +15,26 @@ use crate::{
     config::SiriusConfig,
     controller::{
         list::{list_controller, list_project_controller},
+        sync::{sync_user, SyncMode},
         update::update_controller,
-        sync::{SyncMode, sync_user},
     },
     error::RouterError,
 };
 
 #[derive(Deserialize, Clone)]
 #[serde(untagged)]
-pub enum IDType{
+pub enum IDType {
     ID(Uuid),
-    Email(Email)
+    Email(Email),
 }
 
-impl Display for IDType{
+impl Display for IDType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             IDType::Email(ref id) => write!(f, "{}", id.as_str()),
-            IDType::ID(ref id) => write!(f,"{}", id)
+            IDType::ID(ref id) => write!(f, "{}", id),
         }
     }
-
 }
 
 #[derive(Deserialize, Clone)]
@@ -65,9 +64,20 @@ pub async fn update_organisaion(
             return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
         }
     };
-    let identity = config.kratos.validate_session(kratos_cookie).await?;
+    let identity = config
+        .kratos
+        .validate_session(kratos_cookie)
+        .await
+        .map_err(|_| RouterError::Status(StatusCode::UNAUTHORIZED))?;
     info!("identity validated");
-    update_controller(config, payload, request_id, identity).await?;
+    let mut users = Vec::new();
+    for data in &payload {
+        if data.ressource_type == "user" {
+            users.push(data.clone());
+        }
+    }
+    /*let identities =*/ update_controller(config, payload, request_id, identity).await?;
+    //if !users.is_empty() {}
     Ok("200")
 }
 
@@ -88,12 +98,23 @@ pub async fn update_scopes(
             return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
         }
     };
-    let identity = config.kratos.validate_session(kratos_cookie).await?;
+    let identity = config
+        .kratos
+        .validate_session(kratos_cookie)
+        .await
+        .map_err(|_| RouterError::Status(StatusCode::UNAUTHORIZED))?;
     info!("identity validated");
     let mut users = HashMap::new();
+    let mut projects = HashMap::new();
     for data in &payload {
         if data.ressource_type == "user" {
-            users.insert(data.id.to_string(), (data.ressource_id.to_owned(), data.value.clone()));
+            users.insert(
+                data.id.to_string(),
+                (data.ressource_id.to_owned(), data.value.clone()),
+            );
+        }
+        if data.ressource_type == "project" {
+            projects.insert(data.id.to_string(), data.ressource_id.to_owned());
         }
     }
     let scopes = update_controller(config.clone(), payload, &request_id, identity).await?;
@@ -101,7 +122,7 @@ pub async fn update_scopes(
     let sync_mode = if !users.is_empty() {
         SyncMode::User(users)
     } else {
-        SyncMode::Project
+        SyncMode::Project(projects)
     };
     info!("lauching user sync");
     tokio::spawn(sync_user(config, scopes, request_id.clone(), sync_mode));
@@ -125,7 +146,11 @@ pub async fn update_projects(
             return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
         }
     };
-    let identity = config.kratos.validate_session(kratos_cookie).await?;
+    let identity = config
+        .kratos
+        .validate_session(kratos_cookie)
+        .await
+        .map_err(|_| RouterError::Status(StatusCode::UNAUTHORIZED))?;
     info!("identity validated");
     update_controller(config, payload, request_id, identity).await?;
     Ok("200")
