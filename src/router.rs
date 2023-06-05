@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, sync::Arc};
+use std::{fmt::Display, sync::Arc};
 
 use anyhow::anyhow;
 use axum::{extract::State, http::StatusCode, response::Result, Extension, Json};
@@ -15,7 +15,7 @@ use crate::{
     config::SiriusConfig,
     controller::{
         list::{list_controller, list_project_controller},
-        sync::{sync_scopes, sync_user, SyncMode, sync},
+        sync::{sync, sync_scopes, sync_user, SyncMode},
         update::update_controller,
     },
     error::RouterError,
@@ -73,9 +73,7 @@ pub async fn update_organisaion(
     let mut users = Vec::new();
     for data in &payload {
         if data.ressource_type == "user" {
-            users.push(
-                (data.ressource_id.to_owned(), data.value.clone()),
-            );
+            users.push((data.ressource_id.to_owned(), data.value.clone()));
         }
     }
     let identity = update_controller(config.clone(), payload, request_id, identity).await?;
@@ -116,9 +114,7 @@ pub async fn update_scopes(
     let mut projects = Vec::new();
     for data in &payload {
         if data.ressource_type == "user" {
-            users.push(
-                (data.ressource_id.to_owned(), data.value.clone()),
-            );
+            users.push((data.ressource_id.to_owned(), data.value.clone()));
         }
         if data.ressource_type == "project" {
             projects.push(data.ressource_id.to_owned());
@@ -270,7 +266,7 @@ mod http_router_test {
 
     use crate::{
         app, health,
-        utils::test::{configure, IDENTITY_USER, IDENTITY_ORG, IDENTITY_SCOPE},
+        utils::test::{configure, IDENTITY_ORG, IDENTITY_SCOPE, IDENTITY_USER},
     };
 
     #[tokio::test]

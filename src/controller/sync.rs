@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use anyhow::{anyhow, bail, Result};
 use kafka::{
@@ -8,12 +8,11 @@ use kafka::{
 use ory_kratos_client::models::Identity;
 use serde_json::{json, Value};
 use tonic::Request;
-use tracing::{error, log::{warn, info}};
+use tracing::{error, log::info};
 
 use crate::{
     config::SiriusConfig,
     permission::{Input, Mode},
-    router::Data,
 };
 
 async fn extract_sync_id(
@@ -87,7 +86,7 @@ pub async fn sync_scopes(
     let mut def_scope_id = String::new();
     info!("recuparating default scope");
     for (id, data) in scopes {
-        println!("data: {}",data);
+        println!("data: {}", data);
         let name = data
             .as_str()
             .ok_or_else(|| anyhow!("{request_id}: name not a string!"))?;
@@ -97,15 +96,7 @@ pub async fn sync_scopes(
     }
     for (user, role) in users {
         info!("sending payload to iam!");
-        send_to_iam(
-            &config,
-            &def_scope_id,
-            user,
-            role,
-            request_id,
-            "user",
-        )
-        .await?;
+        send_to_iam(&config, &def_scope_id, user, role, request_id, "user").await?;
     }
     Ok(())
 }
