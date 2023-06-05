@@ -1,3 +1,3 @@
 pub mod list;
-pub mod update;
 pub mod sync;
+pub mod update;

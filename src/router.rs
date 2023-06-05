@@ -1,11 +1,11 @@
-use std::{collections::HashMap, fmt::Display, sync::Arc};
+use std::{fmt::Display, sync::Arc};
 
 use anyhow::anyhow;
 use axum::{extract::State, http::StatusCode, response::Result, Extension, Json};
 use axum_extra::extract::cookie::CookieJar;
 use serde::Deserialize;
-use serde_json::Value;
 use serde_email::Email;
+use serde_json::Value;
 use tokio::sync::RwLock;
 use tower_http::request_id::RequestId;
 use tracing::{error, info};
@@ -15,27 +15,26 @@ use crate::{
     config::SiriusConfig,
     controller::{
         list::{list_controller, list_project_controller},
+        sync::{sync, sync_scopes, sync_user, SyncMode},
         update::update_controller,
-        sync::{SyncMode, sync_user},
     },
     error::RouterError,
 };
 
 #[derive(Deserialize, Clone)]
 #[serde(untagged)]
-pub enum IDType{
+pub enum IDType {
     ID(Uuid),
-    Email(Email)
+    Email(Email),
 }
 
-impl Display for IDType{
+impl Display for IDType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             IDType::Email(ref id) => write!(f, "{}", id.as_str()),
-            IDType::ID(ref id) => write!(f,"{}", id)
+            IDType::ID(ref id) => write!(f, "{}", id),
         }
     }
-
 }
 
 #[derive(Deserialize, Clone)]
@@ -65,9 +64,26 @@ pub async fn update_organisaion(
             return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
         }
     };
-    let identity = config.kratos.validate_session(kratos_cookie).await?;
+    let identity = config
+        .kratos
+        .validate_session(kratos_cookie)
+        .await
+        .map_err(|_| RouterError::Status(StatusCode::UNAUTHORIZED))?;
     info!("identity validated");
-    update_controller(config, payload, request_id, identity).await?;
+    let mut users = Vec::new();
+    for data in &payload {
+        if data.ressource_type == "user" {
+            users.push((data.ressource_id.to_owned(), data.value.clone()));
+        }
+    }
+    let identity = update_controller(config.clone(), payload, request_id, identity).await?;
+    if !users.is_empty() {
+        println!("updating scope!");
+        sync_scopes(config.clone(), &identity, request_id, &users).await?;
+        let mode = SyncMode::User(users);
+        println!("updating user!");
+        sync(config, identity, request_id, mode).await?;
+    }
     Ok("200")
 }
 
@@ -88,23 +104,31 @@ pub async fn update_scopes(
             return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
         }
     };
-    let identity = config.kratos.validate_session(kratos_cookie).await?;
+    let identity = config
+        .kratos
+        .validate_session(kratos_cookie)
+        .await
+        .map_err(|_| RouterError::Status(StatusCode::UNAUTHORIZED))?;
     info!("identity validated");
-    let mut users = HashMap::new();
+    let mut users = Vec::new();
+    let mut projects = Vec::new();
     for data in &payload {
         if data.ressource_type == "user" {
-            users.insert(data.id.to_string(), (data.ressource_id.to_owned(), data.value.clone()));
+            users.push((data.ressource_id.to_owned(), data.value.clone()));
+        }
+        if data.ressource_type == "project" {
+            projects.push(data.ressource_id.to_owned());
         }
     }
-    let scopes = update_controller(config.clone(), payload, &request_id, identity).await?;
+    let scope = update_controller(config.clone(), payload, &request_id, identity).await?;
     info!("scope updated");
     let sync_mode = if !users.is_empty() {
         SyncMode::User(users)
     } else {
-        SyncMode::Project
+        SyncMode::Project(projects)
     };
     info!("lauching user sync");
-    tokio::spawn(sync_user(config, scopes, request_id.clone(), sync_mode));
+    tokio::spawn(sync_user(config, scope, request_id.clone(), sync_mode));
     Ok("200")
 }
 
@@ -125,7 +149,11 @@ pub async fn update_projects(
             return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
         }
     };
-    let identity = config.kratos.validate_session(kratos_cookie).await?;
+    let identity = config
+        .kratos
+        .validate_session(kratos_cookie)
+        .await
+        .map_err(|_| RouterError::Status(StatusCode::UNAUTHORIZED))?;
     info!("identity validated");
     update_controller(config, payload, request_id, identity).await?;
     Ok("200")
@@ -238,7 +266,7 @@ mod http_router_test {
 
     use crate::{
         app, health,
-        utils::test::{configure, IDENTITY},
+        utils::test::{configure, IDENTITY_ORG, IDENTITY_SCOPE, IDENTITY_USER},
     };
 
     #[tokio::test]
@@ -291,10 +319,10 @@ mod http_router_test {
         let mut kratos_server = Server::new_async().await;
         let mut opa_server = Server::new_async().await;
         let config = configure(Some(&kratos_server), Some(&opa_server), None).await;
-        let body = "[".to_owned() + IDENTITY + "]";
+        let body = "[".to_owned() + IDENTITY_USER + "]";
         let session = Session::new(
             "bonjour".to_owned(),
-            serde_json::from_str(IDENTITY).unwrap(),
+            serde_json::from_str(IDENTITY_USER).unwrap(),
         );
         let kratos_mock_admin = kratos_server
             .mock(
@@ -355,7 +383,7 @@ mod http_router_test {
         let config = configure(Some(&kratos_server), Some(&opa_server), None).await;
         let session = Session::new(
             "bonjour".to_owned(),
-            serde_json::from_str(IDENTITY).unwrap(),
+            serde_json::from_str(IDENTITY_USER).unwrap(),
         );
         let kratos_mock_admin = kratos_server
             .mock(
@@ -364,7 +392,7 @@ mod http_router_test {
             )
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(IDENTITY)
+            .with_body(IDENTITY_SCOPE)
             .create_async()
             .await;
         let kratos_mock_session = kratos_server
@@ -418,7 +446,7 @@ mod http_router_test {
         let config = configure(Some(&kratos_server), Some(&opa_server), None).await;
         let session = Session::new(
             "bonjour".to_owned(),
-            serde_json::from_str(IDENTITY).unwrap(),
+            serde_json::from_str(IDENTITY_USER).unwrap(),
         );
         let kratos_mock_admin = kratos_server
             .mock(
@@ -427,7 +455,7 @@ mod http_router_test {
             )
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(IDENTITY)
+            .with_body(IDENTITY_ORG)
             .create_async()
             .await;
         let kratos_mock_session = kratos_server
