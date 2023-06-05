@@ -17,7 +17,7 @@ use crate::{
     },
 };
 
-pub static IDENTITY: &str = r#"
+pub static IDENTITY_ORG: &str = r#"
     {
         "id":"af25f904-5319-4011-95a4-343365d64811",
         "schema_id":"default",
@@ -53,9 +53,99 @@ pub static IDENTITY: &str = r#"
         ],
         "metadata_public":null,
         "metadata_admin":{
-        "project":{},
-        "scope":{
-            "222":"lol"
+            "project":{},
+            "scopes":{
+                "7113206d-afc0-41ad-bbca-b1e8113beb82": "default"
+            }
+        },
+        "created_at":"2023-03-17T14:48:52.000392Z",
+        "updated_at":"2023-03-17T14:48:52.000392Z"
+    }"#;
+
+pub static IDENTITY_SCOPE: &str = r#"
+    {
+        "id":"af25f904-5319-4011-95a4-343365d64811",
+        "schema_id":"default",
+        "schema_url":"http://127.0.0.1:4433/schemas/ZGVmYXVsdA",
+        "state":"active",
+        "state_changed_at":"2023-03-17T14:48:51.999240392Z",
+        "traits":{
+            "email":"lol.lol@lol.io",
+            "name":{
+                "first":"lol",
+                "last":"lol"
+            }
+        },
+        "verifiable_addresses":[
+            {
+                "id":"9a93298f-50c5-4ee0-a9b9-95632da77cd7",
+                "value":"lol.lol@lol.io",
+                "verified":false,
+                "via":"email",
+                "status":"sent",
+                "created_at":"2023-03-17T14:48:52.000813Z",
+                "updated_at":"2023-03-17T14:48:52.000813Z"
+            }
+        ],
+        "recovery_addresses":[
+            {
+                "id":"2a675f07-c733-4dce-a280-1fb9054d4a74",
+                "value":"lol.lol@lol.io",
+                "via":"email",
+                "created_at":"2023-03-17T14:48:52.001108Z",
+                "updated_at":"2023-03-17T14:48:52.001108Z"
+            }
+        ],
+        "metadata_public":null,
+        "metadata_admin":{
+            "projects":[122, 334, 456]
+        },
+        "created_at":"2023-03-17T14:48:52.000392Z",
+        "updated_at":"2023-03-17T14:48:52.000392Z"
+    }"#;
+
+pub static IDENTITY_USER: &str = r#"
+    {
+        "id":"af25f904-5319-4011-95a4-343365d64811",
+        "schema_id":"default",
+        "schema_url":"http://127.0.0.1:4433/schemas/ZGVmYXVsdA",
+        "state":"active",
+        "state_changed_at":"2023-03-17T14:48:51.999240392Z",
+        "traits":{
+            "email":"lol.lol@lol.io",
+            "name":{
+                "first":"lol",
+                "last":"lol"
+            }
+        },
+        "verifiable_addresses":[
+            {
+                "id":"9a93298f-50c5-4ee0-a9b9-95632da77cd7",
+                "value":"lol.lol@lol.io",
+                "verified":false,
+                "via":"email",
+                "status":"sent",
+                "created_at":"2023-03-17T14:48:52.000813Z",
+                "updated_at":"2023-03-17T14:48:52.000813Z"
+            }
+        ],
+        "recovery_addresses":[
+            {
+                "id":"2a675f07-c733-4dce-a280-1fb9054d4a74",
+                "value":"lol.lol@lol.io",
+                "via":"email",
+                "created_at":"2023-03-17T14:48:52.001108Z",
+                "updated_at":"2023-03-17T14:48:52.001108Z"
+            }
+        ],
+        "metadata_public":null,
+        "metadata_admin":{
+            "project":{},
+            "scopes":{
+                "7113206d-afc0-41ad-bbca-b1e8113beb82": {
+                    "name" : "awesome",
+                    "projects" : [122, 334, 456]
+                }
             }
         },
         "created_at":"2023-03-17T14:48:52.000392Z",

@@ -15,7 +15,7 @@ use crate::{
     config::SiriusConfig,
     controller::{
         list::{list_controller, list_project_controller},
-        sync::{sync_user, SyncMode},
+        sync::{sync_scopes, sync_user, SyncMode, sync},
         update::update_controller,
     },
     error::RouterError,
@@ -73,11 +73,19 @@ pub async fn update_organisaion(
     let mut users = Vec::new();
     for data in &payload {
         if data.ressource_type == "user" {
-            users.push(data.clone());
+            users.push(
+                (data.ressource_id.to_owned(), data.value.clone()),
+            );
         }
     }
-    /*let identities =*/ update_controller(config, payload, request_id, identity).await?;
-    //if !users.is_empty() {}
+    let identity = update_controller(config.clone(), payload, request_id, identity).await?;
+    if !users.is_empty() {
+        println!("updating scope!");
+        sync_scopes(config.clone(), &identity, request_id, &users).await?;
+        let mode = SyncMode::User(users);
+        println!("updating user!");
+        sync(config, identity, request_id, mode).await?;
+    }
     Ok("200")
 }
 
@@ -104,20 +112,19 @@ pub async fn update_scopes(
         .await
         .map_err(|_| RouterError::Status(StatusCode::UNAUTHORIZED))?;
     info!("identity validated");
-    let mut users = HashMap::new();
-    let mut projects = HashMap::new();
+    let mut users = Vec::new();
+    let mut projects = Vec::new();
     for data in &payload {
         if data.ressource_type == "user" {
-            users.insert(
-                data.id.to_string(),
+            users.push(
                 (data.ressource_id.to_owned(), data.value.clone()),
             );
         }
         if data.ressource_type == "project" {
-            projects.insert(data.id.to_string(), data.ressource_id.to_owned());
+            projects.push(data.ressource_id.to_owned());
         }
     }
-    let scopes = update_controller(config.clone(), payload, &request_id, identity).await?;
+    let scope = update_controller(config.clone(), payload, &request_id, identity).await?;
     info!("scope updated");
     let sync_mode = if !users.is_empty() {
         SyncMode::User(users)
@@ -125,7 +132,7 @@ pub async fn update_scopes(
         SyncMode::Project(projects)
     };
     info!("lauching user sync");
-    tokio::spawn(sync_user(config, scopes, request_id.clone(), sync_mode));
+    tokio::spawn(sync_user(config, scope, request_id.clone(), sync_mode));
     Ok("200")
 }
 
@@ -263,7 +270,7 @@ mod http_router_test {
 
     use crate::{
         app, health,
-        utils::test::{configure, IDENTITY},
+        utils::test::{configure, IDENTITY_USER, IDENTITY_ORG, IDENTITY_SCOPE},
     };
 
     #[tokio::test]
@@ -316,10 +323,10 @@ mod http_router_test {
         let mut kratos_server = Server::new_async().await;
         let mut opa_server = Server::new_async().await;
         let config = configure(Some(&kratos_server), Some(&opa_server), None).await;
-        let body = "[".to_owned() + IDENTITY + "]";
+        let body = "[".to_owned() + IDENTITY_USER + "]";
         let session = Session::new(
             "bonjour".to_owned(),
-            serde_json::from_str(IDENTITY).unwrap(),
+            serde_json::from_str(IDENTITY_USER).unwrap(),
         );
         let kratos_mock_admin = kratos_server
             .mock(
@@ -380,7 +387,7 @@ mod http_router_test {
         let config = configure(Some(&kratos_server), Some(&opa_server), None).await;
         let session = Session::new(
             "bonjour".to_owned(),
-            serde_json::from_str(IDENTITY).unwrap(),
+            serde_json::from_str(IDENTITY_USER).unwrap(),
         );
         let kratos_mock_admin = kratos_server
             .mock(
@@ -389,7 +396,7 @@ mod http_router_test {
             )
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(IDENTITY)
+            .with_body(IDENTITY_SCOPE)
             .create_async()
             .await;
         let kratos_mock_session = kratos_server
@@ -443,7 +450,7 @@ mod http_router_test {
         let config = configure(Some(&kratos_server), Some(&opa_server), None).await;
         let session = Session::new(
             "bonjour".to_owned(),
-            serde_json::from_str(IDENTITY).unwrap(),
+            serde_json::from_str(IDENTITY_USER).unwrap(),
         );
         let kratos_mock_admin = kratos_server
             .mock(
@@ -452,7 +459,7 @@ mod http_router_test {
             )
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(IDENTITY)
+            .with_body(IDENTITY_ORG)
             .create_async()
             .await;
         let kratos_mock_session = kratos_server
