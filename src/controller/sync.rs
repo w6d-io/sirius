@@ -23,8 +23,8 @@ async fn extract_sync_id(
     let metadata = match &mut identity.metadata_admin {
         Some(ref mut metadata) => metadata,
         None => {
-            error!("{request_id}: no metadata in this scope!");
-            bail!("{request_id}: no metadata in this scope!")
+            error!("{request_id}: no metadata in this group!");
+            bail!("{request_id}: no metadata in this group!")
         }
     };
     let mut ret = Vec::new();
@@ -63,40 +63,40 @@ fn get_producer(
     }
 }
 
-pub async fn sync_scopes(
+pub async fn sync_groups(
     config: Arc<SiriusConfig>,
     identity: &Identity,
     request_id: &str,
     users: &[(String, Value)],
 ) -> Result<()> {
-    info!("recuparating scopes from identity");
-    let scopes = match identity.metadata_admin {
-        Some(ref meta) => match meta.get("scopes") {
+    info!("recuparating groups from identity");
+    let groups = match identity.metadata_admin {
+        Some(ref meta) => match meta.get("group") {
             Some(proj) => proj
                 .as_object()
                 .ok_or_else(|| anyhow!("{request_id}: not an array!"))?,
             None => {
-                bail!("{request_id}: no scopes in metadata!")
+                bail!("{request_id}: no groups in metadata!")
             }
         },
         None => {
             bail!("{request_id}: this organisation as no metadata!")
         }
     };
-    let mut def_scope_id = String::new();
-    info!("recuparating default scope");
-    for (id, data) in scopes {
+    let mut def_group_id = String::new();
+    info!("recuparating default group");
+    for (id, data) in groups {
         println!("data: {}", data);
         let name = data
             .as_str()
             .ok_or_else(|| anyhow!("{request_id}: name not a string!"))?;
         if name == "default" {
-            def_scope_id = id.to_owned();
+            def_group_id = id.to_owned();
         }
     }
     for (user, role) in users {
         info!("sending payload to iam!");
-        send_to_iam(&config, &def_scope_id, user, role, request_id, "user").await?;
+        send_to_iam(&config, &def_group_id, user, role, request_id, "user").await?;
     }
     Ok(())
 }
@@ -197,12 +197,12 @@ pub async fn sync(
 ) -> Result<()> {
     let id = identity.id.clone();
     let mut projects = match identity.metadata_admin {
-        Some(ref mut meta) => match meta.get_mut("projects") {
+        Some(ref mut meta) => match meta.get_mut("project") {
             Some(proj) => proj.take(),
             None => Value::Null,
         },
         None => {
-            bail!("{request_id}: this scope as no metadata!");
+            bail!("{request_id}: this group as no metadata!");
         }
     };
     match mode {
@@ -213,9 +213,9 @@ pub async fn sync(
                     .ok_or_else(|| anyhow!("{request_id}: not an array"))?
                     .push(Value::String(new_project));
                 let users = extract_sync_id(&mut identity, request_id, "user").await?;
-                let json = json!({ "projects": projects });
+                let json = json!({ "project": projects });
                 for user in users {
-                    send_to_iam(&config, &user, &id, &json, request_id, "scopes").await?;
+                    send_to_iam(&config, &user, &id, &json, request_id, "group").await?;
                 }
             }
         }
@@ -224,16 +224,16 @@ pub async fn sync(
                 let name = match identity.traits {
                     Some(ref mut traits) => traits
                         .get_mut("name")
-                        .ok_or_else(|| anyhow!("{request_id}: this scope as no name!"))?
+                        .ok_or_else(|| anyhow!("{request_id}: this group as no name!"))?
                         .take(),
-                    None => bail!("{request_id}: this scope as no trait!"),
+                    None => bail!("{request_id}: this group as no trait!"),
                 };
                 let json = json!({
                     "name": name,
-                    "projects": projects,
+                    "project": projects,
                     "role": role
                 });
-                send_to_iam(&config, &user, &id, &json, request_id, "scopes").await?;
+                send_to_iam(&config, &user, &id, &json, request_id, "group").await?;
             }
         }
     };
@@ -246,7 +246,7 @@ mod test_sync {
     use std::sync::Arc;
     use uuid::Uuid;
 
-    use crate::utils::test::{configure, IDENTITY_ORG, IDENTITY_SCOPE};
+    use crate::utils::test::{configure, IDENTITY_ORG, IDENTITY_GROUP};
 
     use super::*;
 
@@ -258,14 +258,14 @@ mod test_sync {
         let uuid = "1";
         let config = configure(None, None, None).await;
         let config = Arc::new(config);
-        send_to_iam(&config, &user, &id, &json, uuid, "scopes")
+        send_to_iam(&config, &user, &id, &json, uuid, "groups")
             .await
             .unwrap();
     }
 
     #[tokio::test]
     async fn test_sync_simple() {
-        let identity = serde_json::from_str(IDENTITY_SCOPE).unwrap();
+        let identity = serde_json::from_str(IDENTITY_GROUP).unwrap();
         let uuid = "1";
         let mode = SyncMode::Project(vec!["test".to_owned(), "test".to_owned()]);
         let config = configure(None, None, None).await;
@@ -274,12 +274,12 @@ mod test_sync {
     }
 
     #[tokio::test]
-    async fn test_sync_scopes_scopes_simple() {
+    async fn test_sync_groups_simple() {
         let identity = serde_json::from_str(IDENTITY_ORG).unwrap();
         let uuid = "1";
         let user = &[("test".to_owned(), Value::Null)];
         let config = configure(None, None, None).await;
         let config = Arc::new(config);
-        sync_scopes(config, &identity, uuid, user).await.unwrap();
+        sync_groups(config, &identity, uuid, user).await.unwrap();
     }
 }

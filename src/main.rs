@@ -22,7 +22,7 @@ mod handelers;
 use handelers::{fallback, shutdown_signal};
 mod router;
 use router::{
-    alive, list_projects, list_scopes, ready, update_organisaion, update_projects, update_scopes,
+    alive, list_projects, list_groups, ready, update_organisaion, update_projects, update_groups,
 };
 mod config;
 use config::{SiriusConfig, CONFIG_FALLBACK};
@@ -36,14 +36,11 @@ type ConfigState = Arc<RwLock<SiriusConfig>>;
 ///main router config
 pub fn app(shared_state: ConfigState) -> Router {
     info!("configuring main router");
-    let project_route = Router::new().route("/", post(update_projects).get(list_projects));
-    let list_scopes = Router::new().route("/", post(update_scopes).get(list_scopes));
-    let list_orga = Router::new().route("/", post(update_organisaion).get(list_orga));
 
     let api_route = Router::new()
-        .nest("/project", project_route)
-        .nest("/scope", list_scopes)
-        .nest("/organisation", list_orga);
+        .route("/project", post(update_projects).get(list_projects))
+        .route("/group",  post(update_groups).get(list_groups))
+        .route("/organisation", post(update_organisaion).get(list_orga));
 
     Router::new()
         .nest("/api/iam", api_route)

@@ -54,7 +54,7 @@ pub static IDENTITY_ORG: &str = r#"
         "metadata_public":null,
         "metadata_admin":{
             "project":{},
-            "scopes":{
+            "group":{
                 "7113206d-afc0-41ad-bbca-b1e8113beb82": "default"
             }
         },
@@ -62,7 +62,7 @@ pub static IDENTITY_ORG: &str = r#"
         "updated_at":"2023-03-17T14:48:52.000392Z"
     }"#;
 
-pub static IDENTITY_SCOPE: &str = r#"
+pub static IDENTITY_GROUP: &str = r#"
     {
         "id":"af25f904-5319-4011-95a4-343365d64811",
         "schema_id":"default",
@@ -98,7 +98,7 @@ pub static IDENTITY_SCOPE: &str = r#"
         ],
         "metadata_public":null,
         "metadata_admin":{
-            "projects":[122, 334, 456]
+            "project":[122, 334, 456]
         },
         "created_at":"2023-03-17T14:48:52.000392Z",
         "updated_at":"2023-03-17T14:48:52.000392Z"
@@ -141,7 +141,7 @@ pub static IDENTITY_USER: &str = r#"
         "metadata_public":null,
         "metadata_admin":{
             "project":{},
-            "scopes":{
+            "group":{
                 "7113206d-afc0-41ad-bbca-b1e8113beb82": {
                     "name" : "awesome",
                     "projects" : [122, 334, 456]
