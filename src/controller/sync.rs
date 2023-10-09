@@ -183,7 +183,7 @@ async fn send_to_iam(
         value: serde_json::to_string(&json).unwrap(),
         ..Default::default()
     };
-    input.set_mode(Mode::Meta);
+    input.set_mode(Mode::Admin);
     let request = Request::new(input);
     iam_client.replace_permission(request).await?;
     Ok(())

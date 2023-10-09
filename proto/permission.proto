@@ -10,8 +10,9 @@ service Iam {
 }
 
 enum Mode {
-	Meta	= 0;
-	Trait	= 1;
+	Admin	= 0;
+	Public  = 1;
+	Trait	= 2;
 }
 
 message Input {

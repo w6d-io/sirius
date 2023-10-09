@@ -72,7 +72,7 @@ async fn send_to_iam(
         value,
         ..Default::default()
     };
-    input.set_mode(Mode::Meta);
+    input.set_mode(Mode::Admin);
     let request = Request::new(input);
     client.add_permission(request).await?;
     Ok(())
