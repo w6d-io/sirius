@@ -139,7 +139,7 @@ pub mod test_controler {
 
     #[tokio::test]
     async fn test_get_kratos_identity_email() {
-        let id = IDType::Email(Email::new("lol.lol@lol.io".to_owned()).unwrap());
+        let id = IDType::Email(Email::from_str("lol.lol@lol.io").unwrap());
         let uuid = "1";
         let mut kratos_server = MockServer::new_async().await;
         let config = configure(Some(&kratos_server), None, None).await;
@@ -161,7 +161,7 @@ pub mod test_controler {
     #[tokio::test]
     async fn test_send_to_iam_email() {
         let data = Data {
-            id: IDType::Email(Email::new("lol.lol@lol.io".to_owned()).unwrap()),
+            id: IDType::Email(Email::from_str("lol.lol@lol.io").unwrap()),
             ressource_type: "test".to_owned(),
             ressource_id: "222".to_owned(),
             value: Value::Array(vec![Value::String("admin".to_owned())]),
@@ -176,7 +176,7 @@ pub mod test_controler {
     #[tokio::test]
     async fn test_update_controler_simple() {
         let data = Data {
-            id: IDType::Email(Email::new("lol.lol@lol.io".to_owned()).unwrap()),
+            id: IDType::Email(Email::from_str("lol.lol@lol.io").unwrap()),
             ressource_type: "test".to_owned(),
             ressource_id: "222".to_owned(),
             value: Value::Array(vec![Value::String("admin".to_owned())]),
@@ -214,7 +214,7 @@ pub mod test_controler {
     #[tokio::test]
     async fn test_update_controler_multiple() {
         let data = Data {
-            id: IDType::Email(Email::new("lol.lol@lol.io".to_owned()).unwrap()),
+            id: IDType::Email(Email::from_str("lol.lol@lol.io").unwrap()),
             ressource_type: "test".to_owned(),
             ressource_id: "222".to_owned(),
             value: Value::String("admin".to_owned()),
