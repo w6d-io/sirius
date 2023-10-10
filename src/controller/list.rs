@@ -29,7 +29,7 @@ fn extract_projects(
         .ok_or_else(|| anyhow!("this should be a map!"))?;
     if !data.is_empty() {
         for (_, val) in data.into_iter() {
-            if let Some(proj) = val.get_mut("projects") {
+            if let Some(proj) = val.get_mut("project") {
                 populate_set(projects, proj.take(), request_id)?;
             }
         }
@@ -52,8 +52,8 @@ pub async fn list_project_controller(
     if let Some(data) = metadata.get_mut("project") {
         populate_set(&mut projects, data.take(), request_id)?;
     }
-    if let Some(scope) = metadata.get_mut("scope") {
-        extract_projects(&mut projects, scope.take(), request_id)?;
+    if let Some(group) = metadata.get_mut("group") {
+        extract_projects(&mut projects, group.take(), request_id)?;
     }
     if let Some(orga) = metadata.get_mut("organisation") {
         extract_projects(&mut projects, orga.take(), request_id)?;

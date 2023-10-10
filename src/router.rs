@@ -15,7 +15,7 @@ use crate::{
     config::SiriusConfig,
     controller::{
         list::{list_controller, list_project_controller},
-        sync::{sync, sync_scopes, sync_user, SyncMode},
+        sync::{sync, sync_groups, sync_user, SyncMode},
         update::update_controller,
     },
     error::RouterError,
@@ -78,8 +78,8 @@ pub async fn update_organisaion(
     }
     let identity = update_controller(config.clone(), payload, request_id, identity).await?;
     if !users.is_empty() {
-        println!("updating scope!");
-        sync_scopes(config.clone(), &identity, request_id, &users).await?;
+        println!("updating group!");
+        sync_groups(config.clone(), &identity, request_id, &users).await?;
         let mode = SyncMode::User(users);
         println!("updating user!");
         sync(config, identity, request_id, mode).await?;
@@ -87,7 +87,7 @@ pub async fn update_organisaion(
     Ok("200")
 }
 
-pub async fn update_scopes(
+pub async fn update_groups(
     State(config): State<Arc<RwLock<SiriusConfig>>>,
     request_id: Extension<RequestId>,
     cookies: CookieJar,
@@ -120,15 +120,15 @@ pub async fn update_scopes(
             projects.push(data.ressource_id.to_owned());
         }
     }
-    let scope = update_controller(config.clone(), payload, &request_id, identity).await?;
-    info!("scope updated");
+    let group = update_controller(config.clone(), payload, &request_id, identity).await?;
+    info!("group updated");
     let sync_mode = if !users.is_empty() {
         SyncMode::User(users)
     } else {
         SyncMode::Project(projects)
     };
     info!("lauching user sync");
-    tokio::spawn(sync_user(config, scope, request_id.clone(), sync_mode));
+    tokio::spawn(sync_user(config, group, request_id.clone(), sync_mode));
     Ok("200")
 }
 
@@ -182,7 +182,7 @@ pub async fn list_projects(
     Ok(resp)
 }
 
-pub async fn list_scopes(
+pub async fn list_groups(
     State(config): State<Arc<RwLock<SiriusConfig>>>,
     request_id: Extension<RequestId>,
     cookies: CookieJar,
@@ -199,7 +199,7 @@ pub async fn list_scopes(
     };
     let identity = config.kratos.validate_session(kratos_cookie).await?;
     info!("identity validated");
-    let data = list_controller(request_id, identity, "scope").await?;
+    let data = list_controller(request_id, identity, "group").await?;
     let resp = serde_json::to_string(&data)?;
 
     Ok(resp)
@@ -266,7 +266,7 @@ mod http_router_test {
 
     use crate::{
         app, health,
-        utils::test::{configure, IDENTITY_ORG, IDENTITY_SCOPE, IDENTITY_USER},
+        utils::test::{configure, IDENTITY_ORG, IDENTITY_GROUP, IDENTITY_USER},
     };
 
     #[tokio::test]
@@ -377,7 +377,7 @@ mod http_router_test {
     }
 
     #[tokio::test]
-    async fn test_update_scope() {
+    async fn test_update_group() {
         let mut kratos_server = Server::new_async().await;
         let mut opa_server = Server::new_async().await;
         let config = configure(Some(&kratos_server), Some(&opa_server), None).await;
@@ -392,7 +392,7 @@ mod http_router_test {
             )
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(IDENTITY_SCOPE)
+            .with_body(IDENTITY_GROUP)
             .create_async()
             .await;
         let kratos_mock_session = kratos_server
@@ -415,7 +415,7 @@ mod http_router_test {
             .oneshot(
                 Request::builder()
                     .method(Method::POST)
-                    .uri("/api/iam/scope")
+                    .uri("/api/iam/group")
                     .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .header("Cookie", "ory_kratos_session=bonjour")
                     .body(Body::from(
