@@ -1,7 +1,7 @@
 opa = "http://127.0.0.1:8000"
 
 [kratos]
-addr = "http://kratos-public.kratos:4434"
+addr = "http://kratos-public.kratos"
 
 [service]
 addr = "0.0.0.0"
