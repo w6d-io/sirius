@@ -22,7 +22,6 @@ use crate::permission::iam_client::IamClient;
 
 pub const CONFIG_FALLBACK: &str = "test/config.toml";
 
-
 ///structure containing kafka consumer data
 #[derive(Deserialize, Clone, Default)]
 pub struct Producer {
