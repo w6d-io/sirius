@@ -11,6 +11,9 @@ generatorOptions:
   disableNameSuffixHash: true
 
 configMapGenerator:
-  - files:
-      - config.toml
-    name: sirius-config
+- files:
+  - config.toml
+  name: sirius-config
+images:
+- name: w6dio/sirius
+  newName: w6dio/sirius
