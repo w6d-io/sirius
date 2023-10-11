@@ -16,21 +16,21 @@ spec:
                 port:
                   number: 8080
             pathType: Prefix
-            path: /api/iam/project/
+            path: /api/iam/project
           - backend:
               service:
                 name: sirius
                 port:
                   number: 8080
             pathType: Prefix
-            path: /api/iam/organisation/
+            path: /api/iam/organisation
           - backend:
               service:
                 name: sirius
                 port:
                   number: 8080
             pathType: Prefix
-            path: /api/iam/scope/
+            path: /api/iam/scope
   tls:
     - hosts:
         - www2.dev.w6d.io
