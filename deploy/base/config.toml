@@ -9,7 +9,7 @@ ports.main = "8080"
 ports.health = "2040"
 
 [iam.service]
-addr = "iam"
+addr = "iam.w6d-bkd"
 ports.main = "5050"
 ports.health = "1040"
 
