@@ -2,6 +2,11 @@ name: Release docker image
 
 on:
   push:
+    paths:
+      - src/**
+      - Cargo.lock
+      - Cargo.toml
+      - Dockerfile
     tags:
       - v*
 

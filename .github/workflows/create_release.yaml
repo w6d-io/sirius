@@ -1,14 +1,20 @@
 on:
   pull_request:
+    paths:
+      - src/**
+      - Cargo.lock
+      - Cargo.toml
+      - Dockerfile
     types:
       - closed
+
 
 jobs:
   build:
     runs-on: ubuntu-latest
     if: github.event.pull_request.merged
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Tag and prepare release
         id: tag_and_prepare_release
         uses: K-Phoen/semver-release-action@master
@@ -16,16 +22,9 @@ jobs:
           release_branch: main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload release notes
-        if: steps.tag_and_prepare_release.outputs.tag
-        uses: Roang-zero1/github-create-release-action@v3
-        with:
-          created_tag: ${{ steps.tag_and_prepare_release.outputs.tag }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Configure Git
         run: |
-          git config user.name "$GITHUB_ACTOR"
+          git config user.name  "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -59,7 +58,35 @@ jobs:
             PROJECT_URL=${{ steps.build_var.outputs.PROJECT_URL }}
           tags: |
             w6dio/sirius:${{ steps.tag_and_prepare_release.outputs.tag }}
-
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
+      - name: Upload release notes
+        uses: Roang-zero1/github-create-release-action@v3
+        with:
+          created_tag: ${{ steps.tag_and_prepare_release.outputs.tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  update-kustomize-image:
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 'deploy'
+      - name: Configure Git
+        run: |
+          git config user.name  "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+      - name: setup kustomize
+        uses: imranismail/setup-kustomize@v2
+      - name: update deploy
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd ${GITHUB_WORKSPACE}/deploy/base
+          kustomize edit set image w6dio/sirius=w6dio/sirius:${{needs.build.tag_and_prepare_release.outputs.tag}}
+          git add .
+          git commit -m "chore: set image tag to `${{needs.build.tag_and_prepare_release.outputs.tag}}`"
+          git push

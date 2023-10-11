@@ -7,6 +7,15 @@ jobs:
   enforce-label:
     runs-on: ubuntu-latest
     steps:
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            src:
+              - src/**
+              - Cargo.lock
+              - Cargo.toml
+              - Dockerfile
       - uses: yogevbd/enforce-label-action@2.1.0
         with:
           REQUIRED_LABELS_ANY: "major,minor,patch"

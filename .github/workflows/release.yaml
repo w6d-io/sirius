@@ -2,6 +2,11 @@ name: Release latest docker image
 
 on:
   push:
+    paths:
+      - src/**
+      - Cargo.lock
+      - Cargo.toml
+      - Dockerfile
     branches:
       - main
 
