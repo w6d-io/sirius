@@ -22,8 +22,8 @@ async fn extract_sync_id(
     config: &Arc<SiriusConfig>
 ) -> Result<Vec<String>> {
     let mut meta = match &config.mode as &str {
-        "metadata_admin" => &mut identity.metadata_admin,
-        "metadata_public" => &mut identity.metadata_public,
+        "admin" => &mut identity.metadata_admin,
+        "public" => &mut identity.metadata_public,
         "trait" =>  &mut identity.traits,
         _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config")
     };
@@ -79,8 +79,8 @@ pub async fn sync_groups(
 ) -> Result<()> {
     info!("recuparating groups from identity");
     let meta = match &config.mode as &str {
-        "metadata_admin" => &identity.metadata_admin,
-        "metadata_public" => &identity.metadata_public,
+        "admin" => &identity.metadata_admin,
+        "public" => &identity.metadata_public,
         "trait" => &identity.traits,
         _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config")
     };
@@ -217,8 +217,8 @@ pub async fn sync(
 ) -> Result<()> {
     let id = identity.id.clone();
     let meta = match &config.mode as &str {
-        "metadata_admin" => &mut identity.metadata_admin,
-        "metadata_public" => &mut identity.metadata_public,
+        "admin" => &mut identity.metadata_admin,
+        "public" => &mut identity.metadata_public,
         "trait" => &mut identity.traits,
         _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config")
     };
