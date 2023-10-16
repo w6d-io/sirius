@@ -19,8 +19,16 @@ async fn extract_sync_id(
     identity: &mut Identity,
     request_id: &str,
     sync_type: &str,
+    config: &Arc<SiriusConfig>
 ) -> Result<Vec<String>> {
-    let metadata = match &mut identity.metadata_admin {
+    let mut meta = match &config.mode as &str {
+        "metadata_admin" => &mut identity.metadata_admin,
+        "metadata_public" => &mut identity.metadata_public,
+        "trait" =>  &mut identity.traits,
+        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config")
+    };
+
+    let metadata = match &mut meta {
         Some(ref mut metadata) => metadata,
         None => {
             error!("{request_id}: no metadata in this group!");
@@ -70,7 +78,13 @@ pub async fn sync_groups(
     users: &[(String, Value)],
 ) -> Result<()> {
     info!("recuparating groups from identity");
-    let groups = match identity.metadata_admin {
+    let meta = match &config.mode as &str {
+        "metadata_admin" => &identity.metadata_admin,
+        "metadata_public" => &identity.metadata_public,
+        "trait" => &identity.traits,
+        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config")
+    };
+    let groups = match meta {
         Some(ref meta) => match meta.get("group") {
             Some(proj) => proj
                 .as_object()
@@ -183,7 +197,13 @@ async fn send_to_iam(
         value: serde_json::to_string(&json).unwrap(),
         ..Default::default()
     };
-    input.set_mode(Mode::Admin);
+     let mode = match &config.mode as &str {
+        "admin" => Mode::Admin,
+        "public" => Mode::Public,
+        "trait" => Mode::Trait,
+        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config")
+    };
+    input.set_mode(mode);
     let request = Request::new(input);
     iam_client.replace_permission(request).await?;
     Ok(())
@@ -196,7 +216,14 @@ pub async fn sync(
     mode: SyncMode,
 ) -> Result<()> {
     let id = identity.id.clone();
-    let mut projects = match identity.metadata_admin {
+    let meta = match &config.mode as &str {
+        "metadata_admin" => &mut identity.metadata_admin,
+        "metadata_public" => &mut identity.metadata_public,
+        "trait" => &mut identity.traits,
+        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config")
+    };
+
+    let mut projects = match meta {
         Some(ref mut meta) => match meta.get_mut("project") {
             Some(proj) => proj.take(),
             None => Value::Null,
@@ -212,7 +239,7 @@ pub async fn sync(
                     .as_array_mut()
                     .ok_or_else(|| anyhow!("{request_id}: not an array"))?
                     .push(Value::String(new_project));
-                let users = extract_sync_id(&mut identity, request_id, "user").await?;
+                let users = extract_sync_id(&mut identity, request_id, "user", &config).await?;
                 let json = json!({ "project": projects });
                 for user in users {
                     send_to_iam(&config, &user, &id, &json, request_id, "group").await?;

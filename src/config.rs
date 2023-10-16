@@ -93,6 +93,7 @@ pub struct Iam {
 #[derive(Deserialize, Clone, Default, Debug)]
 pub struct SiriusConfig {
     // pub prefix: String,
+    pub mode: String,
     pub service: Service,
     pub iam: Iam,
     pub opa: String,

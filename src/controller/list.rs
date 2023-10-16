@@ -6,6 +6,8 @@ use serde_json::Value;
 
 use tracing::error;
 
+use crate::config::SiriusConfig;
+
 fn populate_set(projects: &mut HashSet<String>, mut data: Value, request_id: &str) -> Result<()> {
     let data = data.take();
     let data = data
@@ -40,9 +42,18 @@ fn extract_projects(
 pub async fn list_project_controller(
     request_id: &str,
     identity: Identity,
+    config: SiriusConfig
 ) -> Result<HashSet<String>> {
     let mut projects = HashSet::new();
-    let mut metadata = match identity.metadata_admin {
+    let meta = match &config.mode as &str {
+        "metadata_admin" => identity.metadata_admin,
+        "metadata_public" => identity.metadata_public,
+        "trait" =>  identity.traits,
+        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config")
+    };
+
+
+    let mut metadata = match meta {
         Some(mut metadata) => metadata.take(),
         None => {
             error!("{request_id}: no metadata in this user!");
@@ -65,9 +76,17 @@ pub async fn list_controller(
     request_id: &str,
     identity: Identity,
     data_type: &str,
+    config: SiriusConfig
 ) -> Result<HashMap<String, String>> {
     let mut projects = HashMap::new();
-    let metadata = match identity.metadata_admin {
+    let meta = match &config.mode as &str {
+        "metadata_admin" => &identity.metadata_admin,
+        "metadata_public" => &identity.metadata_public,
+        "trait" => &identity.traits,
+        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config")
+    };
+
+    let metadata = match meta {
         Some(metadata) => metadata,
         None => {
             error!("{request_id}: no metadata in this user!");

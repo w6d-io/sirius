@@ -51,8 +51,8 @@ pub static IDENTITY_ORG: &str = r#"
                 "updated_at":"2023-03-17T14:48:52.001108Z"
             }
         ],
-        "metadata_public":null,
-        "metadata_admin":{
+        "metadata_admin":null,
+        "metadata_public":{
             "project":{},
             "group":{
                 "7113206d-afc0-41ad-bbca-b1e8113beb82": "default"
@@ -96,8 +96,8 @@ pub static IDENTITY_GROUP: &str = r#"
                 "updated_at":"2023-03-17T14:48:52.001108Z"
             }
         ],
-        "metadata_public":null,
-        "metadata_admin":{
+        "metadata_admin":null,
+        "metadata_public":{
             "project":[122, 334, 456]
         },
         "created_at":"2023-03-17T14:48:52.000392Z",
@@ -138,8 +138,8 @@ pub static IDENTITY_USER: &str = r#"
                 "updated_at":"2023-03-17T14:48:52.001108Z"
             }
         ],
-        "metadata_public":null,
-        "metadata_admin":{
+        "metadata_admin":null,
+        "metadata_public":{
             "project":{},
             "group":{
                 "7113206d-afc0-41ad-bbca-b1e8113beb82": {
