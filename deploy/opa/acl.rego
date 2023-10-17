@@ -7,7 +7,7 @@ default main = false
 main if {
 
 	#    # set the role  if the ressource id is present in the role attribute of the user
-	role = data.metadata_admin[_][_][input.resource]
+	role = data.metadata_public[_][_][input.resource]
 	matchUrl with input as {
 		"method": input.method,
 		"uri": input.uri,
