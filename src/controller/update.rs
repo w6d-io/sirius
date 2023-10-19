@@ -72,7 +72,13 @@ async fn send_to_iam(
         value,
         ..Default::default()
     };
-    input.set_mode(Mode::Admin);
+     let mode = match &config.mode as &str {
+        "admin" => Mode::Admin,
+        "public" => Mode::Public,
+        "trait" => Mode::Trait,
+        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config")
+    };
+    input.set_mode(mode);
     let request = Request::new(input);
     client.add_permission(request).await?;
     Ok(())

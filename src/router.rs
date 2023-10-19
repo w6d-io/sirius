@@ -176,7 +176,7 @@ pub async fn list_projects(
     };
     let identity = config.kratos.validate_session(kratos_cookie).await?;
     info!("identity validated");
-    let data = list_project_controller(request_id, identity).await?;
+    let data = list_project_controller(request_id, identity, config).await?;
     let resp = serde_json::to_string(&data)?;
 
     Ok(resp)
@@ -199,7 +199,7 @@ pub async fn list_groups(
     };
     let identity = config.kratos.validate_session(kratos_cookie).await?;
     info!("identity validated");
-    let data = list_controller(request_id, identity, "group").await?;
+    let data = list_controller(request_id, identity, "group", config).await?;
     let resp = serde_json::to_string(&data)?;
 
     Ok(resp)
@@ -222,7 +222,7 @@ pub async fn list_orga(
     };
     let identity = config.kratos.validate_session(kratos_cookie).await?;
     info!("identity validated");
-    let data = list_controller(request_id, identity, "organisation").await?;
+    let data = list_controller(request_id, identity, "organisation", config).await?;
     let resp = serde_json::to_string(&data)?;
 
     Ok(resp)
