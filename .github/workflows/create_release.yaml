@@ -90,5 +90,5 @@ jobs:
           cd ${GITHUB_WORKSPACE}/deploy/base
           kustomize edit set image w6dio/sirius=w6dio/sirius:${{needs.build.outputs.tag}}
           git add .
-          git commit -m "chore: set image tag to `${{needs.build.outputs.tag}}`"
+          git commit -m "chore: set image tag to ${{needs.build.outputs.tag}}"
           git push

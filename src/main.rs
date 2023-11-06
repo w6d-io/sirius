@@ -22,7 +22,7 @@ mod handelers;
 use handelers::{fallback, shutdown_signal};
 mod router;
 use router::{
-    alive, list_projects, list_groups, ready, update_organisaion, update_projects, update_groups,
+    alive, list_groups, list_projects, ready, update_groups, update_organisaion, update_projects,
 };
 mod config;
 use config::{SiriusConfig, CONFIG_FALLBACK};
@@ -39,7 +39,7 @@ pub fn app(shared_state: ConfigState) -> Router {
 
     let api_route = Router::new()
         .route("/project", post(update_projects).get(list_projects))
-        .route("/group",  post(update_groups).get(list_groups))
+        .route("/group", post(update_groups).get(list_groups))
         .route("/organisation", post(update_organisaion).get(list_orga));
 
     Router::new()
