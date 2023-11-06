@@ -19,13 +19,13 @@ async fn extract_sync_id(
     identity: &mut Identity,
     request_id: &str,
     sync_type: &str,
-    config: &Arc<SiriusConfig>
+    config: &Arc<SiriusConfig>,
 ) -> Result<Vec<String>> {
     let mut meta = match &config.mode as &str {
         "admin" => &mut identity.metadata_admin,
         "public" => &mut identity.metadata_public,
-        "trait" =>  &mut identity.traits,
-        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config")
+        "trait" => &mut identity.traits,
+        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config"),
     };
 
     let metadata = match &mut meta {
@@ -82,7 +82,7 @@ pub async fn sync_groups(
         "admin" => &identity.metadata_admin,
         "public" => &identity.metadata_public,
         "trait" => &identity.traits,
-        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config")
+        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config"),
     };
     let groups = match meta {
         Some(ref meta) => match meta.get("group") {
@@ -197,11 +197,11 @@ async fn send_to_iam(
         value: serde_json::to_string(&json).unwrap(),
         ..Default::default()
     };
-     let mode = match &config.mode as &str {
+    let mode = match &config.mode as &str {
         "admin" => Mode::Admin,
         "public" => Mode::Public,
         "trait" => Mode::Trait,
-        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config")
+        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config"),
     };
     input.set_mode(mode);
     let request = Request::new(input);
@@ -220,7 +220,7 @@ pub async fn sync(
         "admin" => &mut identity.metadata_admin,
         "public" => &mut identity.metadata_public,
         "trait" => &mut identity.traits,
-        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config")
+        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config"),
     };
 
     let mut projects = match meta {
@@ -273,7 +273,7 @@ mod test_sync {
     use std::sync::Arc;
     use uuid::Uuid;
 
-    use crate::utils::test::{configure, IDENTITY_ORG, IDENTITY_GROUP};
+    use crate::utils::test::{configure, IDENTITY_GROUP, IDENTITY_ORG};
 
     use super::*;
 

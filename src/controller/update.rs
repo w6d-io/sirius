@@ -72,11 +72,11 @@ async fn send_to_iam(
         value,
         ..Default::default()
     };
-     let mode = match &config.mode as &str {
+    let mode = match &config.mode as &str {
         "admin" => Mode::Admin,
         "public" => Mode::Public,
         "trait" => Mode::Trait,
-        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config")
+        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config"),
     };
     input.set_mode(mode);
     let request = Request::new(input);

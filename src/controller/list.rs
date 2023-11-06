@@ -42,16 +42,15 @@ fn extract_projects(
 pub async fn list_project_controller(
     request_id: &str,
     identity: Identity,
-    config: SiriusConfig
+    config: SiriusConfig,
 ) -> Result<HashSet<String>> {
     let mut projects = HashSet::new();
     let meta = match &config.mode as &str {
-        "metadata_admin" => identity.metadata_admin,
-        "metadata_public" => identity.metadata_public,
-        "trait" =>  identity.traits,
-        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config")
+        "admin" => identity.metadata_admin,
+        "public" => identity.metadata_public,
+        "trait" => identity.traits,
+        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config"),
     };
-
 
     let mut metadata = match meta {
         Some(mut metadata) => metadata.take(),
@@ -76,14 +75,14 @@ pub async fn list_controller(
     request_id: &str,
     identity: Identity,
     data_type: &str,
-    config: SiriusConfig
+    config: SiriusConfig,
 ) -> Result<HashMap<String, String>> {
     let mut projects = HashMap::new();
     let meta = match &config.mode as &str {
-        "metadata_admin" => &identity.metadata_admin,
-        "metadata_public" => &identity.metadata_public,
+        "admin" => &identity.metadata_admin,
+        "public" => &identity.metadata_public,
         "trait" => &identity.traits,
-        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config")
+        _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config"),
     };
 
     let metadata = match meta {

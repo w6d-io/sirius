@@ -266,7 +266,7 @@ mod http_router_test {
 
     use crate::{
         app, health,
-        utils::test::{configure, IDENTITY_ORG, IDENTITY_GROUP, IDENTITY_USER},
+        utils::test::{configure, IDENTITY_GROUP, IDENTITY_ORG, IDENTITY_USER},
     };
 
     #[tokio::test]
