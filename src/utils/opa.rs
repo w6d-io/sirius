@@ -7,7 +7,7 @@ use crate::config::SiriusConfig;
 
 #[derive(Deserialize, Serialize)]
 struct Input<'a> {
-    url: &'a str,
+    uri: &'a str,
     method: &'a str,
     role: &'a str, // scop? add to option file
     resource: &'a str,
@@ -17,7 +17,7 @@ struct Input<'a> {
 struct OpaData<'a> {
     #[serde(borrow)]
     input: Input<'a>,
-    identity: Identity,
+    data: Identity,
 }
 pub async fn validate_roles(
     config: &SiriusConfig,
@@ -27,14 +27,14 @@ pub async fn validate_roles(
     uri: &str,
 ) -> Result<bool> {
     let input = Input {
-        url: uri,
-        method: "get",
-        role: "owner", //get from conf file
+        uri,
+        method: "post",
+        role: "unused", //get from conf file
         resource: project_id,
     };
     let opa = OpaData {
         input,
-        identity: identity.to_owned(),
+        data: identity.to_owned(),
     };
     let client = match &config.kratos.client {
         Some(client) => client,
