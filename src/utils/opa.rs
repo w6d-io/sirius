@@ -17,7 +17,7 @@ struct Input<'a> {
 struct OpaData<'a> {
     #[serde(borrow)]
     input: Input<'a>,
-    identity: Identity,
+    data: Identity,
 }
 pub async fn validate_roles(
     config: &SiriusConfig,
@@ -34,7 +34,7 @@ pub async fn validate_roles(
     };
     let opa = OpaData {
         input,
-        identity: identity.to_owned(),
+        data: identity.to_owned(),
     };
     let client = match &config.kratos.client {
         Some(client) => client,
