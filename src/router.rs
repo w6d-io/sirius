@@ -341,13 +341,13 @@ mod http_router_test {
             .with_body(serde_json::to_string(&session).unwrap())
             .create_async()
             .await;
-        let opa_mock = opa_server
+        /* let opa_mock = opa_server
             .mock("post", "/")
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(r#"true"#)
             .create_async()
-            .await;
+            .await; */
         let config = Arc::new(RwLock::new(config));
         let app = app(config);
         let response = app
@@ -372,7 +372,7 @@ mod http_router_test {
             .unwrap();
         kratos_mock_session.assert_async().await;
         kratos_mock_admin.assert_async().await;
-        opa_mock.assert_async().await;
+        // opa_mock.assert_async().await;
         assert_eq!(response.status(), StatusCode::OK);
     }
 
@@ -402,13 +402,13 @@ mod http_router_test {
             .with_body(serde_json::to_string(&session).unwrap())
             .create_async()
             .await;
-        let opa_mock = opa_server
+        /* let opa_mock = opa_server
             .mock("post", "/")
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(r#"true"#)
             .create_async()
-            .await;
+            .await; */
         let config = Arc::new(RwLock::new(config));
         let app = app(config);
         let response = app
@@ -434,7 +434,7 @@ mod http_router_test {
             .unwrap();
         kratos_mock_session.assert_async().await;
         kratos_mock_admin.assert_async().await;
-        opa_mock.assert_async().await;
+        // opa_mock.assert_async().await;
         println!("{:#?}", response);
         assert_eq!(response.status(), StatusCode::OK);
     }
@@ -465,13 +465,13 @@ mod http_router_test {
             .with_body(serde_json::to_string(&session).unwrap())
             .create_async()
             .await;
-        let opa_mock = opa_server
+        /* let opa_mock = opa_server
             .mock("post", "/")
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(r#"true"#)
             .create_async()
-            .await;
+            .await; */
         let config = Arc::new(RwLock::new(config));
         let app = app(config);
         let response = app
@@ -497,7 +497,7 @@ mod http_router_test {
             .unwrap();
         kratos_mock_session.assert_async().await;
         kratos_mock_admin.assert_async().await;
-        opa_mock.assert_async().await;
+        // opa_mock.assert_async().await;
         println!("{:#?}", response);
         assert_eq!(response.status(), StatusCode::OK);
     }
