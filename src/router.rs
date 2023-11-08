@@ -342,12 +342,12 @@ mod http_router_test {
             .create_async()
             .await;
         /* let opa_mock = opa_server
-            .mock("post", "/")
-            .with_status(200)
-            .with_header("content-type", "application/json")
-            .with_body(r#"true"#)
-            .create_async()
-            .await; */
+        .mock("post", "/")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(r#"true"#)
+        .create_async()
+        .await; */
         let config = Arc::new(RwLock::new(config));
         let app = app(config);
         let response = app
@@ -403,12 +403,12 @@ mod http_router_test {
             .create_async()
             .await;
         /* let opa_mock = opa_server
-            .mock("post", "/")
-            .with_status(200)
-            .with_header("content-type", "application/json")
-            .with_body(r#"true"#)
-            .create_async()
-            .await; */
+        .mock("post", "/")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(r#"true"#)
+        .create_async()
+        .await; */
         let config = Arc::new(RwLock::new(config));
         let app = app(config);
         let response = app
@@ -466,12 +466,12 @@ mod http_router_test {
             .create_async()
             .await;
         /* let opa_mock = opa_server
-            .mock("post", "/")
-            .with_status(200)
-            .with_header("content-type", "application/json")
-            .with_body(r#"true"#)
-            .create_async()
-            .await; */
+        .mock("post", "/")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(r#"true"#)
+        .create_async()
+        .await; */
         let config = Arc::new(RwLock::new(config));
         let app = app(config);
         let response = app

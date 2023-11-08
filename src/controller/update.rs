@@ -106,6 +106,36 @@ pub async fn update_controller(
             Err(anyhow!("Invalid role!"))?;
         } */
         println!("role validated!");
+        if let Some(ref ident) = object_identity {
+            match data.id {
+                IDType::ID(id) if id.to_string() != ident.id => {
+                    object_identity = Some(Arc::new(
+                        get_kratos_identity(&config, &data.id, request_id).await?,
+                    ))
+                }
+                IDType::Email(ref id) => match &ident.traits {
+                    Some(traits) => match traits.get("email") {
+                        Some(email) if email == id.as_str() => (),
+                        _ => {
+                            object_identity = Some(Arc::new(
+                                get_kratos_identity(&config, &data.id, request_id).await?,
+                            ))
+                        }
+                    },
+                    None => {
+                        object_identity = Some(Arc::new(
+                            get_kratos_identity(&config, &data.id, request_id).await?,
+                        ))
+                    }
+                },
+                _ => (),
+            }
+        } else {
+            object_identity = Some(Arc::new(
+                get_kratos_identity(&config, &data.id, request_id).await?,
+            ));
+        }
+        info!("kratos identity obtained!");
         match object_identity {
             Some(ref ident) => {
                 handles.spawn(send_to_iam(
@@ -115,12 +145,7 @@ pub async fn update_controller(
                     request_id.to_owned(),
                 ));
             }
-            None => {
-                object_identity = Some(Arc::new(
-                    get_kratos_identity(&config, &data.id, request_id).await?,
-                ));
-                info!("kratos identity obtained!");
-            }
+            None => bail!("the identity is not initialized this should not be happening!"),
         }
     }
     while let Some(future) = handles.join_next().await {
@@ -203,12 +228,12 @@ pub mod test_controler {
             .create_async()
             .await;
         /* let opa_mock = opa_server
-            .mock("post", "/")
-            .with_status(200)
-            .with_header("content-type", "application/json")
-            .with_body(r#"true"#)
-            .create_async()
-            .await; */
+        .mock("post", "/")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(r#"true"#)
+        .create_async()
+        .await; */
         let identity = serde_json::from_str(IDENTITY_USER).unwrap();
         update_controller(Arc::new(config), vec![data], uuid, identity)
             .await
@@ -241,13 +266,13 @@ pub mod test_controler {
             .create_async()
             .await;
         /* let opa_mock = opa_server
-            .mock("post", "/")
-            .with_status(200)
-            .with_header("content-type", "application/json")
-            .with_body(r#"true"#)
-            .expect(2)
-            .create_async()
-            .await; */
+        .mock("post", "/")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(r#"true"#)
+        .expect(2)
+        .create_async()
+        .await; */
 
         let identity = serde_json::from_str(IDENTITY_USER).unwrap();
         update_controller(Arc::new(config), vec![data.clone(), data], uuid, identity)
