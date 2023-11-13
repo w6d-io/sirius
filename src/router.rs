@@ -120,6 +120,8 @@ pub async fn update_groups(
             projects.push(data.ressource_id.to_owned());
         }
     }
+    info!("users: {users:?}");
+    info!("project: {projects:?}");
     let group = update_controller(config.clone(), payload, &request_id, identity).await?;
     info!("group updated");
     let sync_mode = if !users.is_empty() {
