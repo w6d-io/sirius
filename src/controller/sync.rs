@@ -240,7 +240,6 @@ pub async fn sync(
                     .ok_or_else(|| anyhow!("{request_id}: not an array"))?
                     .push(Value::String(new_project));
                 let users = extract_sync_id(&mut identity, request_id, "user", &config).await?;
-                info!("users: {users:?}");
                 let json = json!({ "project": projects });
                 for user in users {
                     send_to_iam(&config, &user, &id, &json, request_id, "group").await?;
