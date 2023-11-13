@@ -8,6 +8,7 @@ use kafka::{
 use ory_kratos_client::models::Identity;
 use serde_json::{json, Value};
 use tonic::Request;
+use tower::discover;
 use tracing::{error, log::info};
 
 use crate::{
@@ -46,6 +47,7 @@ async fn extract_sync_id(
     Ok(ret)
 }
 
+#[derive(Debug)]
 pub enum SyncMode {
     User(Vec<(String, Value)>),
     Project(Vec<String>),
@@ -233,6 +235,7 @@ pub async fn sync(
         }
     };
     info!("old project: {projects:?}");
+    info!("sync mode: {mode:?}");
     match mode {
         SyncMode::Project(data) => {
             for new_project in data {
