@@ -149,8 +149,10 @@ pub async fn sync_user(
                     panic!();
                 }
             }
+            info!("data synced successfully!");
         }
         Err(e) => {
+            error!("an error has occurred when syncing data: {e}");
             let message = KafkaMessage {
                 payload: e.to_string(),
                 key: None,
