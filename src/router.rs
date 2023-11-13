@@ -124,13 +124,21 @@ pub async fn update_groups(
     info!("project: {projects:?}");
     let group = update_controller(config.clone(), payload, &request_id, identity).await?;
     info!("group updated");
-    let sync_mode = if !users.is_empty() {
-        SyncMode::User(users)
-    } else {
-        SyncMode::Project(projects)
-    };
-    info!("lauching user sync");
-    tokio::spawn(sync_user(config, group, request_id.clone(), sync_mode));
+    if !users.is_empty() {
+        let sync_mode = SyncMode::User(users);
+        info!("lauching users sync");
+        tokio::spawn(sync_user(
+            config.clone(),
+            group.clone(),
+            request_id.clone(),
+            sync_mode,
+        ));
+    }
+    if !projects.is_empty() {
+        let sync_mode = SyncMode::Project(projects);
+        info!("lauching projects sync");
+        tokio::spawn(sync_user(config, group, request_id.clone(), sync_mode));
+    }
     Ok("200")
 }
 
