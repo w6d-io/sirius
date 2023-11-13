@@ -232,18 +232,23 @@ pub async fn sync(
             bail!("{request_id}: this group as no metadata!");
         }
     };
+    info!("old project: {projects:?}");
     match mode {
         SyncMode::Project(data) => {
             for new_project in data {
-                projects
+                let old_project = projects
                     .as_array_mut()
-                    .ok_or_else(|| anyhow!("{request_id}: not an array"))?
-                    .push(Value::String(new_project));
-                let users = extract_sync_id(&mut identity, request_id, "user", &config).await?;
-                let json = json!({ "project": projects });
-                for user in users {
-                    send_to_iam(&config, &user, &id, &json, request_id, "group").await?;
+                    .ok_or_else(|| anyhow!("{request_id}: not an array"))?;
+                let new_project = Value::String(new_project);
+                if !old_project.contains(&new_project) {
+                    old_project.push(new_project);
                 }
+            }
+            let json = json!({ "project": projects });
+            info!("new project list: {json}");
+            let users = extract_sync_id(&mut identity, request_id, "user", &config).await?;
+            for user in users {
+                send_to_iam(&config, &user, &id, &json, request_id, "group").await?;
             }
         }
         SyncMode::User(data) => {
