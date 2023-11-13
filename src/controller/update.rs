@@ -63,7 +63,7 @@ async fn send_to_iam(
         .clone()
         .ok_or_else(|| anyhow!("{request_id}: Iam client not initialized!"))?;
     let value = data.value.to_string();
-    println!("{value}");
+    info!("{value}");
 
     let mut input = Input {
         id: identity.id.clone(),
