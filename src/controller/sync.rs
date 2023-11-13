@@ -90,7 +90,7 @@ pub async fn sync_groups(
         Some(ref meta) => match meta.get("group") {
             Some(proj) => proj
                 .as_object()
-                .ok_or_else(|| anyhow!("{request_id}: not an array!"))?,
+                .ok_or_else(|| anyhow!("{request_id}: not an object!"))?,
             None => {
                 bail!("{request_id}: no groups in metadata!")
             }
@@ -229,24 +229,29 @@ pub async fn sync(
 
     let mut projects = match meta {
         Some(ref mut meta) => match meta.get_mut("project") {
-            Some(proj) => proj.take(),
-            None => Value::Null,
+            Some(proj) => {
+                let old_projects = proj
+                    .as_object()
+                    .ok_or_else(|| anyhow!("{request_id}: not an object"))?;
+                old_projects
+                    .keys()
+                    .map(|e| e.as_str().to_owned())
+                    .collect::<Vec<String>>()
+            }
+            None => Vec::new(),
         },
         None => {
             bail!("{request_id}: this group as no metadata!");
         }
     };
+
     info!("old project: {projects:?}");
     info!("sync mode: {mode:?}");
     match mode {
         SyncMode::Project(data) => {
             for new_project in data {
-                let old_project = projects
-                    .as_array_mut()
-                    .ok_or_else(|| anyhow!("{request_id}: not an array"))?;
-                let new_project = Value::String(new_project);
-                if !old_project.contains(&new_project) {
-                    old_project.push(new_project);
+                if !projects.contains(&new_project) {
+                    projects.push(new_project);
                 }
             }
             let json = json!({ "project": projects });
