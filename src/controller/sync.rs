@@ -8,6 +8,7 @@ use kafka::{
 use ory_kratos_client::models::Identity;
 use serde_json::{json, Value};
 use tonic::Request;
+use tower::discover;
 use tracing::{error, log::info};
 
 use crate::{
@@ -208,7 +209,7 @@ async fn send_to_iam(
     };
     input.set_mode(mode);
     let request = Request::new(input);
-    iam_client.add_permission(request).await?;
+    iam_client.replace_permission(request).await?;
     Ok(())
 }
 
