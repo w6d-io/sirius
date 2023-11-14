@@ -109,8 +109,9 @@ pub async fn sync_groups(
             def_group_id = id.to_owned();
         }
     }
+    info!("sending payload to iam!");
     for (user, role) in users {
-        info!("sending payload to iam!");
+        info!("patching user: {user}.");
         send_to_iam(&config, &def_group_id, user, role, request_id, "user").await?;
     }
     Ok(())
@@ -208,7 +209,7 @@ async fn send_to_iam(
     };
     input.set_mode(mode);
     let request = Request::new(input);
-    iam_client.add_permission(request).await?;
+    iam_client.replace_permission(request).await?;
     Ok(())
 }
 
