@@ -8,7 +8,6 @@ use kafka::{
 use ory_kratos_client::models::Identity;
 use serde_json::{json, Value};
 use tonic::Request;
-use tower::discover;
 use tracing::{error, log::info};
 
 use crate::{
@@ -110,8 +109,9 @@ pub async fn sync_groups(
             def_group_id = id.to_owned();
         }
     }
+    info!("sending payload to iam!");
     for (user, role) in users {
-        info!("sending payload to iam!");
+        info!("patching user: {user}.");
         send_to_iam(&config, &def_group_id, user, role, request_id, "user").await?;
     }
     Ok(())
