@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::{anyhow, bail, Result};
 use kafka::{
@@ -20,7 +20,7 @@ async fn extract_sync_id(
     request_id: &str,
     sync_type: &str,
     config: &Arc<SiriusConfig>,
-) -> Result<Vec<String>> {
+) -> Result<HashMap<String, Vec<Value>>> {
     let mut meta = match &config.mode as &str {
         "admin" => &mut identity.metadata_admin,
         "public" => &mut identity.metadata_public,
@@ -35,11 +35,15 @@ async fn extract_sync_id(
             bail!("{request_id}: no metadata in this group!")
         }
     };
-    let mut ret = Vec::new();
-    if let Some(val) = metadata.get_mut(sync_type) {
-        if let Some(val) = val.take().as_object() {
-            for k in val.keys() {
-                ret.push(k.clone());
+    let mut ret = HashMap::new();
+    if let Some(val) = metadata.get(sync_type) {
+        if let Some(val) = val.as_object() {
+            for (k, v) in val {
+                let v = match v.as_array() {
+                    Some(value) => value.to_owned(),
+                    None => Vec::new(),
+                };
+                ret.insert(k.clone(), v);
             }
         }
     };
@@ -244,7 +248,13 @@ pub async fn sync(
             bail!("{request_id}: this group as no metadata!");
         }
     };
-
+    let name = match identity.traits {
+        Some(ref mut traits) => traits
+            .get_mut("name")
+            .ok_or_else(|| anyhow!("{request_id}: this group as no name!"))?
+            .take(),
+        None => bail!("{request_id}: this group as no trait!"),
+    };
     info!("old project: {projects:?}");
     info!("sync mode: {mode:?}");
     match mode {
@@ -254,23 +264,20 @@ pub async fn sync(
                     projects.push(new_project);
                 }
             }
-            let json = json!({ "project": projects });
-            info!("new project list: {json}");
             let users = extract_sync_id(&mut identity, request_id, "user", &config).await?;
-            for user in users {
+            for (user, role) in users {
+                let json = json!({
+                    "name": name,
+                    "project": projects,
+                    "role": role
+                });
+                info!("new project list: {json}");
                 info!("patching user: {user}.");
                 send_to_iam(&config, &user, &id, &json, request_id, "group").await?;
             }
         }
         SyncMode::User(data) => {
             for (user, role) in data {
-                let name = match identity.traits {
-                    Some(ref mut traits) => traits
-                        .get_mut("name")
-                        .ok_or_else(|| anyhow!("{request_id}: this group as no name!"))?
-                        .take(),
-                    None => bail!("{request_id}: this group as no trait!"),
-                };
                 let json = json!({
                     "name": name,
                     "project": projects,
