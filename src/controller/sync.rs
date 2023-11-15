@@ -258,6 +258,7 @@ pub async fn sync(
             info!("new project list: {json}");
             let users = extract_sync_id(&mut identity, request_id, "user", &config).await?;
             for user in users {
+                info!("patching user: {user}.");
                 send_to_iam(&config, &user, &id, &json, request_id, "group").await?;
             }
         }
