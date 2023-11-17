@@ -91,7 +91,7 @@ pub async fn sync_groups(
     };
     let groups = match meta {
         Some(ref meta) => match meta.get("group") {
-            Some(proj) => proj
+            Some(grps) => grps
                 .as_object()
                 .ok_or_else(|| anyhow!("{request_id}: not an object!"))?,
             None => {
@@ -102,21 +102,23 @@ pub async fn sync_groups(
             bail!("{request_id}: this organisation as no metadata!")
         }
     };
-    let mut def_group_id = String::new();
+    let mut default_group_id = String::new();
     info!("recuparating default group");
     for (id, data) in groups {
         println!("data: {}", data);
         let name = data
+            .pointer("/name")
+            .ok_or_else(|| anyhow!("{request_id}: name not present or in the wrong place"))?
             .as_str()
             .ok_or_else(|| anyhow!("{request_id}: name not a string!"))?;
         if name == "default" {
-            def_group_id = id.to_owned();
+            default_group_id = id.to_owned();
         }
     }
     info!("sending payload to iam!");
     for (user, role) in users {
         info!("patching user: {user}.");
-        send_to_iam(&config, &def_group_id, user, role, request_id, "user").await?;
+        send_to_iam(&config, &default_group_id, user, role, request_id, "user").await?;
     }
     Ok(())
 }
@@ -230,7 +232,6 @@ pub async fn sync(
         "trait" => &mut identity.traits,
         _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config"),
     };
-
     let mut projects = match meta {
         Some(ref mut meta) => match meta.get_mut("project") {
             Some(proj) => {
