@@ -4,7 +4,7 @@ use anyhow::{anyhow, bail, Ok, Result};
 use ory_kratos_client::models::Identity;
 use serde_json::Value;
 
-use tracing::error;
+use tracing::{error, info};
 
 use crate::config::SiriusConfig;
 
@@ -60,12 +60,15 @@ pub async fn list_project_controller(
         }
     };
     if let Some(data) = metadata.get_mut("project") {
+        info!("{request_id}: extracting project from project");
         populate_set(&mut projects, data.take(), request_id)?;
     }
     if let Some(group) = metadata.get_mut("group") {
+        info!("{request_id}: extracting project from group");
         extract_projects(&mut projects, group.take(), request_id)?;
     }
     if let Some(orga) = metadata.get_mut("organisation") {
+        info!("{request_id}: extracting project from orga");
         extract_projects(&mut projects, orga.take(), request_id)?;
     }
     Ok(projects)
@@ -93,6 +96,7 @@ pub async fn list_controller(
         }
     };
     if let Some(data) = metadata.get(data_type) {
+        info!("{request_id}: estracting: {data_type}");
         let data = data
             .as_object()
             .ok_or_else(|| anyhow!("this should be a map!"))?;
