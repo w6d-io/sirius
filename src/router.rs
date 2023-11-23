@@ -76,7 +76,14 @@ pub async fn update_organisaion(
             users.push((data.ressource_id.to_owned(), data.value.clone()));
         }
     }
-    let identity = update_controller(config.clone(), payload, request_id, identity).await?;
+    let identity = update_controller(
+        config.clone(),
+        payload,
+        request_id,
+        identity,
+        "organisation",
+    )
+    .await?;
     if !users.is_empty() {
         println!("updating group!");
         sync_groups(config.clone(), &identity, request_id, &users).await?;
@@ -122,7 +129,7 @@ pub async fn update_groups(
     }
     info!("users: {users:?}");
     info!("project: {projects:?}");
-    let group = update_controller(config.clone(), payload, &request_id, identity).await?;
+    let group = update_controller(config.clone(), payload, &request_id, identity, "groups").await?;
     info!("group updated");
     if !users.is_empty() {
         let sync_mode = SyncMode::User(users);
@@ -165,7 +172,7 @@ pub async fn update_projects(
         .await
         .map_err(|_| RouterError::Status(StatusCode::UNAUTHORIZED))?;
     info!("identity validated");
-    update_controller(config, payload, request_id, identity).await?;
+    update_controller(config, payload, request_id, identity, "projects").await?;
     Ok("200")
 }
 
