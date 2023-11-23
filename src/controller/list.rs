@@ -4,19 +4,31 @@ use anyhow::{anyhow, bail, Ok, Result};
 use ory_kratos_client::models::Identity;
 use serde_json::Value;
 
-use tracing::{error, info, debug};
+use tracing::{debug, error, info};
 
 use crate::config::SiriusConfig;
 
 fn populate_set(projects: &mut HashSet<String>, mut data: Value, request_id: &str) -> Result<()> {
     let data = data.take();
-    let data = data
-        .as_object()
-        .ok_or_else(|| anyhow!("{request_id}: This should be a map!"))?;
-    if !data.is_empty() {
-        for (key, _) in data.iter() {
-            projects.insert(key.to_owned());
+    match data {
+        Value::Object(map) => {
+            if !map.is_empty() {
+                for (key, _) in map.iter() {
+                    projects.insert(key.to_owned());
+                }
+            }
         }
+        Value::Array(array) => {
+            if !array.is_empty() {
+                for project in array.iter() {
+                    let project = project
+                        .as_str()
+                        .ok_or_else(|| anyhow!(" this shoud be a string"))?;
+                    projects.insert(project.to_owned());
+                }
+            }
+        }
+        _ => bail!("{request_id}: This should be a map or an array!"),
     }
     Ok(())
 }

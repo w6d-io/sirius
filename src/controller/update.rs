@@ -229,7 +229,7 @@ pub mod test_controler {
         .create_async()
         .await; */
         let identity = serde_json::from_str(IDENTITY_USER).unwrap();
-        update_controller(Arc::new(config), vec![data], uuid, identity)
+        update_controller(Arc::new(config), vec![data], uuid, identity, "project")
             .await
             .unwrap();
         kratos_mock.assert_async().await;
@@ -269,9 +269,15 @@ pub mod test_controler {
         .await; */
 
         let identity = serde_json::from_str(IDENTITY_USER).unwrap();
-        update_controller(Arc::new(config), vec![data.clone(), data], uuid, identity)
-            .await
-            .unwrap();
+        update_controller(
+            Arc::new(config),
+            vec![data.clone(), data],
+            uuid,
+            identity,
+            "project",
+        )
+        .await
+        .unwrap();
         kratos_mock.assert_async().await;
         // opa_mock.assert_async().await;
     }
