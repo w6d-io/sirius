@@ -19,9 +19,9 @@ main if {
 matchUrl if {
 	some k
 	api_attributes = {"post": [
-		{"key": "api/iam/project/", "value": ["admin", "owner"]},
-		{"key": "api/iam/scope/", "value": ["admin", "owner"]},
-		{"key": "api/iam/organisation/", "value": ["admin", "owner"]},
+		{"key": "api/iam/projects", "value": ["admin", "owner"]},
+		{"key": "api/iam/groups", "value": ["admin", "owner"]},
+		{"key": "api/iam/organisation", "value": ["admin", "owner"]},
 
 	]}
 
