@@ -4,7 +4,7 @@ use anyhow::{anyhow, bail, Ok, Result};
 use ory_kratos_client::models::Identity;
 use serde_json::Value;
 
-use tracing::{error, info};
+use tracing::{error, info, debug};
 
 use crate::config::SiriusConfig;
 
@@ -26,6 +26,7 @@ fn extract_projects(
     mut data: Value,
     request_id: &str,
 ) -> Result<()> {
+    debug!("{data:?}");
     let data = data
         .as_object_mut()
         .ok_or_else(|| anyhow!("this should be a map!"))?;
