@@ -96,9 +96,9 @@ pub async fn update_controller(
     let mut object_identity: Option<Arc<Identity>> = None;
     let uri = "api/iam/".to_owned() + endpoint;
     for data in payload.iter() {
-        /* if !validate_roles(&config, &identity, &data.ressource_id, request_id, &uri).await? {
+        if !validate_roles(&config, &identity, &data.ressource_id, request_id, &uri).await? {
             Err(anyhow!("Invalid role!"))?;
-        } */
+        }
         println!("role validated!");
         if let Some(ref ident) = object_identity {
             match data.id {
