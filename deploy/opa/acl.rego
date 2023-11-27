@@ -5,7 +5,7 @@ import future.keywords.in
 default main = false
 
 # check end point right
-matchUrl if {
+matchUrl {
 	some k
 	api_attributes = {"post": [
 		{"key": "api/iam/projects", "value": ["admin", "owner"]},
