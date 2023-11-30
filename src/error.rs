@@ -9,15 +9,15 @@ use tracing::error;
 ///it convert the recevied error in a response
 #[derive(Error, Debug)]
 pub enum RouterError {
-    #[error("failed to serialize data")]
+    #[error("failed to serialize data.")]
     Serialisation(#[from] serde_json::Error),
-    #[error("failed to apply identity patch")]
+    #[error("failed to apply identity patch.")]
     Internal(#[from] anyhow::Error),
-    #[error("failled to convert to string")]
+    #[error("failled to convert to string.")]
     StrConvert(#[from] ToStrError),
-    #[error("the request failed")]
+    #[error("the request failed.")]
     Http(#[from] reqwest::Error),
-    #[error("extract error")]
+    #[error("extract error.")]
     Status(StatusCode),
 }
 
