@@ -1,24 +1,27 @@
 package app.rbac
 
-default main := false
+import future.keywords.in
+
+default main = false
 
 # check end point right
 match_url {
-	some attributes
+	some k
 	api_attributes = {"post": [
 		{"key": "api/iam/projects", "value": ["admin", "owner"]},
 		{"key": "api/iam/groups", "value": ["admin", "owner"]},
 		{"key": "api/iam/organisation", "value": ["admin", "owner"]},
+
 	]}
 
 	uri_list := api_attributes[input.method]
-	uri_list[attributes].key == input.uri
-	uri_list[attributes].value[_] == input.role
+	uri_list[k].key == input.uri
+	uri_list[k].value[_] == input.role
 }
 
 validate_roles {
-	some roles
-	role := data.metadata_public.project[input.resource][roles]
+	roles := data.metadata_public.project[input.resource]
+	some role in roles
 	match_url with input as {
 		"method": input.method,
 		"uri": input.uri,
@@ -27,12 +30,11 @@ validate_roles {
 }
 
 validate_roles {
-	some type
-	some scop
-	some project
-	project_id := data.metadata_public[type][scop].project[project]
+	some type in data.metadata_public
+	some scop in type
+	some project_id in scop.project
 	format_int(project_id, 10) == input.resource
-	role := scop.role[_]
+	some role in scop.role
 	match_url with input as {
 		"method": input.method,
 		"uri": input.uri,
