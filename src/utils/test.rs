@@ -144,7 +144,7 @@ pub static IDENTITY_USER: &str = r#"
             "group":{
                 "7113206d-afc0-41ad-bbca-b1e8113beb82": {
                     "name" : "awesome",
-                    "projects" : [122, 334, 456]
+                    "project" : [122, 334, 456]
                 }
             }
         },
