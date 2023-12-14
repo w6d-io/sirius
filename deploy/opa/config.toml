@@ -1,3 +1,8 @@
 [kafka]
 service = "rpk-0.rpk.kafka.svc.cluster.local:9092,rpk-1.rpk.kafka.svc.cluster.local:9092,rpk-2.rpk.kafka.svc.cluster.local:9092"
 topics = {error = "opa-error"}
+
+[service]
+addr = "0.0.0.0"
+ports.main = "8000"
+ports.health = "2040"
