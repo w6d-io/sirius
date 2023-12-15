@@ -36,7 +36,7 @@ spec:
           readinessProbe:
             failureThreshold: 3
             httpGet:
-              path: /ready
+              path: /health/ready
               port: 2040
               scheme: HTTP
             periodSeconds: 10
@@ -45,7 +45,7 @@ spec:
           livenessProbe:
             failureThreshold: 3
             httpGet:
-              path: /alive
+              path: /health/alive
               port: 2040
               scheme: HTTP
             periodSeconds: 10
