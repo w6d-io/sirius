@@ -7,7 +7,7 @@ addr = "http://kratos-public.kratos"
 [service]
 addr = "0.0.0.0"
 ports.main = "8080"
-ports.health = "2040"
+ports.health = "2041"
 
 [iam.service]
 addr = "iam"
