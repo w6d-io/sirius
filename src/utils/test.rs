@@ -219,8 +219,8 @@ pub async fn configure(
     };
     kratos.update();
     let mut conf = SiriusConfig::default();
-    conf.mode = "public".to_owned();
-    conf.opa = match opa {
+    conf.opa.mode = "public".to_owned();
+    conf.opa.addr = match opa {
         Some(opa) => opa.url(),
         None => "http://0.0.0.0:8000".to_owned(),
     };

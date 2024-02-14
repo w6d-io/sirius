@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     fmt,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use anyhow::{bail, Result};
@@ -25,47 +26,50 @@ pub const CONFIG_FALLBACK: &str = "test/config.toml";
 ///structure containing kafka consumer data
 #[derive(Deserialize, Clone, Default)]
 pub struct Producer {
-    pub broker: String,
-    pub topic: String,
+    pub topics: Vec<String>,
 
     #[serde(skip)]
-    pub client: Option<KafkaProducer<FutureProducer, DefaultFutureContext>>,
+    pub clients: Option<HashMap<String, Arc<KafkaProducer<FutureProducer, DefaultFutureContext>>>>,
 }
 
 impl fmt::Debug for Producer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let client = match self.client {
-            Some(_) => "Some(_)",
-            None => "None",
+        f.debug_struct("Producer")
+            .field("topics", &self.topics)
+            .finish_non_exhaustive()
+    }
+}
+
+impl Producer {
+    ///update the producer Producers if needed.
+    pub fn update(&mut self, broker: &str) -> Result<()> {
+        let mut new_producer = HashMap::new();
+        let producer = match self.clients {
+            Some(ref mut prod) => prod,
+            None => &mut new_producer,
         };
-        write!(
-            f,
-            "Consumer: {{
-                   brokers: {},
-                   topic: {},
-                   client: {}
-               }}",
-            self.broker, self.topic, client
-        )
+        for topic in self.topics.iter() {
+            producer.insert(
+                topic.to_owned(),
+                Arc::new(KafkaProducer::<FutureProducer, DefaultFutureContext>::new(
+                    &default_config(broker),
+                    topic,
+                )?),
+            );
+        }
+        Ok(())
     }
 }
 
 #[derive(Deserialize, Clone, Default, Debug)]
 pub struct Kafka {
-    pub producers: HashMap<String, Producer>,
+    pub broker: String,
+    pub producers: Producer,
 }
 
 impl Kafka {
     fn update(&mut self) -> Result<&mut Self> {
-        let producers = &mut self.producers;
-        for producer in producers.values_mut() {
-            let new_producer: KafkaProducer<FutureProducer, DefaultFutureContext> =
-                KafkaProducer::<FutureProducer, DefaultFutureContext>::new(
-                    &default_config(&producer.broker),
-                    &producer.topic,
-                )?;
-            producer.client = Some(new_producer);
-        }
+        self.producers.update(&self.broker)?;
         Ok(self)
     }
 }
@@ -89,14 +93,19 @@ pub struct Iam {
     pub client: Option<IamClient<Channel>>,
 }
 
+#[derive(Deserialize, Clone, Default, Debug)]
+pub struct Opa {
+    pub addr: String,
+    pub mode: String,
+}
+
 ///structure containing the configuaration of the application
 #[derive(Deserialize, Clone, Default, Debug)]
 pub struct SiriusConfig {
     // pub prefix: String,
-    pub mode: String,
     pub service: Service,
     pub iam: Iam,
-    pub opa: String,
+    pub opa: Opa,
     pub kratos: Kratos,
     pub kafka: Kafka,
     #[serde(skip)]
@@ -149,7 +158,7 @@ mod test_config {
     #[tokio::test]
     async fn test_update_valid() {
         let mut config = SiriusConfig::default();
-        config.set_path("test/config.toml");
+        config.set_path("tests/config.toml");
         let res = config.update().await;
         assert!(res.is_ok())
     }
@@ -157,7 +166,7 @@ mod test_config {
     #[tokio::test]
     async fn test_update_not_valid() {
         let mut config = SiriusConfig::default();
-        config.set_path("test/not_config.toml");
+        config.set_path("tests/not_config.toml");
         let res = config.update().await;
         assert!(res.is_err())
     }
