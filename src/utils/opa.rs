@@ -23,7 +23,7 @@ pub async fn validate_roles(
     config: &SiriusConfig,
     identity: &Identity,
     project_id: &str,
-    request_id: &str,
+    correlation_id: &str,
     uri: &str,
 ) -> Result<bool> {
     let input = Input {
@@ -38,13 +38,13 @@ pub async fn validate_roles(
     };
     let client = match &config.kratos.client {
         Some(client) => client,
-        None => bail!("{request_id}: kratos client not initialized"),
+        None => bail!("kratos client not initialized"),
     };
 
     let res = client
         .client
         .post(&config.opa.addr)
-        .header("correlation_id", request_id)
+        .header("correlation_id", correlation_id)
         .json(&opa)
         .send()
         .await?;
