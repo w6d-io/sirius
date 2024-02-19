@@ -78,13 +78,22 @@ pub async fn update_controller(
     payload: Vec<Data>,
     _identity: Identity,
     endpoint: &str,
+    _correlation_id: &str,
 ) -> Result<Identity> {
     let mut handles = JoinSet::new();
     let mut object_identity: Option<Arc<Identity>> = None;
     let _uri = "api/iam/".to_owned() + endpoint;
     for data in payload.iter() {
         #[cfg(feature = "opa")]
-        if !validate_roles(&config, &_identity, &data.ressource_id, &_uri).await? {
+        if !validate_roles(
+            &config,
+            &_identity,
+            &data.ressource_id,
+            _correlation_id,
+            &_uri,
+        )
+        .await?
+        {
             Err(anyhow!("Invalid role!"))?;
         }
         println!("role validated!");
@@ -181,6 +190,7 @@ pub mod test_controler {
             ressource_id: "222".to_owned(),
             value: Value::Array(vec![Value::String("admin".to_owned())]),
         };
+        let correlation_id = "1";
         let mut kratos_server = MockServer::new_async().await;
         let opa_server = MockServer::new_async().await;
         let config = configure(Some(&kratos_server), Some(&opa_server), None).await;
@@ -203,9 +213,15 @@ pub mod test_controler {
         .create_async()
         .await; */
         let identity = serde_json::from_str(IDENTITY_USER).unwrap();
-        update_controller(Arc::new(config), vec![data], identity, "project")
-            .await
-            .unwrap();
+        update_controller(
+            Arc::new(config),
+            vec![data],
+            identity,
+            "project",
+            correlation_id,
+        )
+        .await
+        .unwrap();
         kratos_mock.assert_async().await;
         // opa_mock.assert_async().await;
     }
@@ -218,6 +234,7 @@ pub mod test_controler {
             ressource_id: "222".to_owned(),
             value: Value::String("admin".to_owned()),
         };
+        let correlation_id = "1";
         let mut kratos_server = MockServer::new_async().await;
         let opa_server = MockServer::new_async().await;
         let config = configure(Some(&kratos_server), Some(&opa_server), None).await;
@@ -247,6 +264,7 @@ pub mod test_controler {
             vec![data.clone(), data],
             identity,
             "project",
+            correlation_id,
         )
         .await
         .unwrap();

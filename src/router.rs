@@ -51,6 +51,7 @@ async fn update_organisation_handler(
     config: Arc<SiriusConfig>,
     cookies: CookieJar,
     payload: Vec<Data>,
+    correlation_id: &str,
 ) -> Result<(), RouterError> {
     let kratos_cookie = match cookies.get("ory_kratos_session") {
         Some(cookie) => cookie,
@@ -71,7 +72,14 @@ async fn update_organisation_handler(
             users.push((data.ressource_id.to_owned(), data.value.clone()));
         }
     }
-    let identity = update_controller(config.clone(), payload, identity, "organisation").await?;
+    let identity = update_controller(
+        config.clone(),
+        payload,
+        identity,
+        "organisation",
+        correlation_id,
+    )
+    .await?;
     if !users.is_empty() {
         info!("updating group!");
         sync_groups(config.clone(), &identity, &users).await?;
@@ -96,7 +104,9 @@ pub async fn update_organisation(
         .to_str()?;
     let config = config.read().await.clone();
     let config = Arc::new(config);
-    if let Err(e) = update_organisation_handler(config.clone(), cookies, payload).await {
+    if let Err(e) =
+        update_organisation_handler(config.clone(), cookies, payload, correlation_id).await
+    {
         send_error(&config.kafka, "error", &e, correlation_id).await?;
         return Err(e);
     }
@@ -134,7 +144,8 @@ async fn update_groups_handler(
     }
     info!("users: {users:?}");
     info!("project: {projects:?}");
-    let group = update_controller(config.clone(), payload, identity, "groups").await?;
+    let group =
+        update_controller(config.clone(), payload, identity, "groups", correlation_id).await?;
     info!("group updated");
     if !users.is_empty() {
         let sync_mode = SyncMode::User(users);
@@ -184,6 +195,7 @@ async fn update_projects_handler(
     config: Arc<SiriusConfig>,
     cookies: CookieJar,
     payload: Vec<Data>,
+    correlation_id: &str,
 ) -> Result<(), RouterError> {
     let kratos_cookie = match cookies.get("ory_kratos_session") {
         Some(cookie) => cookie,
@@ -198,7 +210,7 @@ async fn update_projects_handler(
         .await
         .map_err(|_| RouterError::Status(StatusCode::UNAUTHORIZED))?;
     info!("identity validated");
-    update_controller(config, payload, identity, "projects").await?;
+    update_controller(config, payload, identity, "projects", correlation_id).await?;
     Ok(())
 }
 
@@ -218,7 +230,8 @@ pub async fn update_projects(
 
     let config = config.read().await.clone();
     let config = Arc::new(config);
-    if let Err(e) = update_projects_handler(config.clone(), cookies, payload).await {
+    if let Err(e) = update_projects_handler(config.clone(), cookies, payload, correlation_id).await
+    {
         send_error(&config.kafka, "error", &e, correlation_id).await?;
         return Err(e);
     }
