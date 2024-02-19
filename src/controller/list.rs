@@ -8,7 +8,7 @@ use tracing::{debug, error, info};
 
 use crate::config::SiriusConfig;
 
-fn populate_set(projects: &mut HashSet<String>, mut data: Value, request_id: &str) -> Result<()> {
+fn populate_set(projects: &mut HashSet<String>, mut data: Value) -> Result<()> {
     let data = data.take();
     match data {
         Value::Object(map) => {
@@ -28,16 +28,12 @@ fn populate_set(projects: &mut HashSet<String>, mut data: Value, request_id: &st
                 }
             }
         }
-        _ => bail!("{request_id}: This should be a map or an array!"),
+        _ => bail!("This should be a map or an array!"),
     }
     Ok(())
 }
 
-fn extract_projects(
-    projects: &mut HashSet<String>,
-    mut data: Value,
-    request_id: &str,
-) -> Result<()> {
+fn extract_projects(projects: &mut HashSet<String>, mut data: Value) -> Result<()> {
     debug!("{data:?}");
     let data = data
         .as_object_mut()
@@ -45,7 +41,7 @@ fn extract_projects(
     if !data.is_empty() {
         for (_, val) in data.into_iter() {
             if let Some(proj) = val.get_mut("project") {
-                populate_set(projects, proj.take(), request_id)?;
+                populate_set(projects, proj.take())?;
             }
         }
     }
@@ -53,12 +49,11 @@ fn extract_projects(
 }
 
 pub async fn list_project_controller(
-    request_id: &str,
     identity: Identity,
-    config: SiriusConfig,
+    config: &SiriusConfig,
 ) -> Result<HashSet<String>> {
     let mut projects = HashSet::new();
-    let meta = match &config.mode as &str {
+    let meta = match &config.opa.mode as &str {
         "admin" => identity.metadata_admin,
         "public" => identity.metadata_public,
         "trait" => identity.traits,
@@ -68,33 +63,32 @@ pub async fn list_project_controller(
     let mut metadata = match meta {
         Some(mut metadata) => metadata.take(),
         None => {
-            error!("{request_id}: no metadata in this user!");
-            bail!("{request_id}: no metadata in this user!")
+            error!("no metadata in this user!");
+            bail!("no metadata in this user!")
         }
     };
     if let Some(data) = metadata.get_mut("project") {
-        info!("{request_id}: extracting project from project");
-        populate_set(&mut projects, data.take(), request_id)?;
+        info!("extracting project from project");
+        populate_set(&mut projects, data.take())?;
     }
     if let Some(group) = metadata.get_mut("group") {
-        info!("{request_id}: extracting project from group");
-        extract_projects(&mut projects, group.take(), request_id)?;
+        info!("extracting project from group");
+        extract_projects(&mut projects, group.take())?;
     }
     if let Some(orga) = metadata.get_mut("organisation") {
-        info!("{request_id}: extracting project from orga");
-        extract_projects(&mut projects, orga.take(), request_id)?;
+        info!("extracting project from orga");
+        extract_projects(&mut projects, orga.take())?;
     }
     Ok(projects)
 }
 
 pub async fn list_controller(
-    request_id: &str,
     identity: Identity,
     data_type: &str,
-    config: SiriusConfig,
+    config: &SiriusConfig,
 ) -> Result<HashMap<String, String>> {
     let mut projects = HashMap::new();
-    let meta = match &config.mode as &str {
+    let meta = match &config.opa.mode as &str {
         "admin" => &identity.metadata_admin,
         "public" => &identity.metadata_public,
         "trait" => &identity.traits,
@@ -104,23 +98,21 @@ pub async fn list_controller(
     let metadata = match meta {
         Some(metadata) => metadata,
         None => {
-            error!("{request_id}: no metadata in this user!");
-            bail!("{request_id}: no metadata in this user!")
+            error!("no metadata in this user!");
+            bail!("no metadata in this user!")
         }
     };
     if let Some(data) = metadata.get(data_type) {
-        info!("{request_id}: estracting: {data_type}");
+        info!("estracting: {data_type}");
         let data = data
             .as_object()
             .ok_or_else(|| anyhow!("this should be a map!"))?;
         if !data.is_empty() {
             for (uuid, map) in data.iter() {
-                let val = map
-                    .get("name")
-                    .ok_or_else(|| anyhow!("{request_id}: no name found !"))?;
+                let val = map.get("name").ok_or_else(|| anyhow!("no name found !"))?;
                 let name = val
                     .as_str()
-                    .ok_or_else(|| anyhow!("{request_id}: this should be a string!"))?;
+                    .ok_or_else(|| anyhow!("this should be a string!"))?;
                 projects.insert(uuid.to_owned(), name.to_owned());
             }
         }

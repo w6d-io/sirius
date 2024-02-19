@@ -43,7 +43,7 @@ pub async fn validate_roles(
 
     let res = client
         .client
-        .post(&config.opa)
+        .post(&config.opa.addr)
         .header("correlation_id", request_id)
         .json(&opa)
         .send()

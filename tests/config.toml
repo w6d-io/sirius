@@ -1,5 +1,6 @@
+[opa]
 mode = "public"
-opa = "http://127.0.0.1:8000"
+addr = "http://127.0.0.1:8000"
 
 [kratos]
 addr = "http://localhost:4434"
@@ -14,8 +15,6 @@ addr = "127.0.0.1"
 ports.main = "5050"
 ports.health = "1040"
 
-[kafka.producers]
-notif.broker = "test"
-notif.topic = "notif"
-error.broker = "test"
-error.topic = "error"
+[kafka]
+broker = "test"
+producers.topics = ["notif", "error"]

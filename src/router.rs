@@ -1,13 +1,12 @@
 use std::{fmt::Display, sync::Arc};
 
 use anyhow::anyhow;
-use axum::{extract::State, http::StatusCode, response::Result, Extension, Json};
+use axum::{extract::State, http::HeaderMap, http::StatusCode, response::Result, Json};
 use axum_extra::extract::cookie::CookieJar;
 use serde::Deserialize;
 use serde_email::Email;
 use serde_json::Value;
 use tokio::sync::RwLock;
-use tower_http::request_id::RequestId;
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -19,9 +18,10 @@ use crate::{
         update::update_controller,
     },
     error::RouterError,
+    utils::error::send_error,
 };
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 #[serde(untagged)]
 pub enum IDType {
     ID(Uuid),
@@ -37,7 +37,7 @@ impl Display for IDType {
     }
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct Data {
     //id :can be the email or the uuid depending of the endpoint
     pub id: IDType,
@@ -47,20 +47,15 @@ pub struct Data {
     pub value: Value,
 }
 
-pub async fn update_organisaion(
-    State(config): State<Arc<RwLock<SiriusConfig>>>,
-    request_id: Extension<RequestId>,
+async fn update_organisation_handler(
+    config: Arc<SiriusConfig>,
     cookies: CookieJar,
-    Json(payload): Json<Vec<Data>>,
-) -> Result<&'static str, RouterError> {
-    info!("new request!");
-    let request_id = request_id.header_value().to_str()?;
-    let config = config.read().await.clone();
-    let config = Arc::new(config);
+    payload: Vec<Data>,
+) -> Result<(), RouterError> {
     let kratos_cookie = match cookies.get("ory_kratos_session") {
         Some(cookie) => cookie,
         None => {
-            error!("{request_id}: kratos cookie not found");
+            error!("Kratos cookie not found");
             return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
         }
     };
@@ -76,38 +71,48 @@ pub async fn update_organisaion(
             users.push((data.ressource_id.to_owned(), data.value.clone()));
         }
     }
-    let identity = update_controller(
-        config.clone(),
-        payload,
-        request_id,
-        identity,
-        "organisation",
-    )
-    .await?;
+    let identity = update_controller(config.clone(), payload, identity, "organisation").await?;
     if !users.is_empty() {
-        println!("updating group!");
-        sync_groups(config.clone(), &identity, request_id, &users).await?;
+        info!("updating group!");
+        sync_groups(config.clone(), &identity, &users).await?;
         let mode = SyncMode::User(users);
-        println!("updating user!");
-        sync(config, identity, request_id, mode).await?;
+        info!("updating user!");
+        sync(&config, identity, mode).await?;
     }
-    Ok("200")
+    Ok(())
 }
-
-pub async fn update_groups(
+#[tracing::instrument]
+#[axum_macros::debug_handler]
+pub async fn update_organisation(
     State(config): State<Arc<RwLock<SiriusConfig>>>,
-    request_id: Extension<RequestId>,
+    headers: HeaderMap,
     cookies: CookieJar,
     Json(payload): Json<Vec<Data>>,
 ) -> Result<&'static str, RouterError> {
     info!("new request!");
-    let request_id = request_id.header_value().to_str()?.to_owned();
+    let correlation_id = headers
+        .get("correlation_id")
+        .ok_or_else(|| anyhow!("the request as no correlation id!"))?
+        .to_str()?;
     let config = config.read().await.clone();
     let config = Arc::new(config);
+    if let Err(e) = update_organisation_handler(config.clone(), cookies, payload).await {
+        send_error(&config.kafka, "error", &e, correlation_id).await?;
+        return Err(e);
+    }
+    Ok("200")
+}
+
+async fn update_groups_handler(
+    config: Arc<SiriusConfig>,
+    cookies: CookieJar,
+    payload: Vec<Data>,
+    correlation_id: &str,
+) -> Result<(), RouterError> {
     let kratos_cookie = match cookies.get("ory_kratos_session") {
         Some(cookie) => cookie,
         None => {
-            error!("{request_id}: kratos cookie not found");
+            error!("Kratos cookie not found");
             return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
         }
     };
@@ -129,7 +134,7 @@ pub async fn update_groups(
     }
     info!("users: {users:?}");
     info!("project: {projects:?}");
-    let group = update_controller(config.clone(), payload, &request_id, identity, "groups").await?;
+    let group = update_controller(config.clone(), payload, identity, "groups").await?;
     info!("group updated");
     if !users.is_empty() {
         let sync_mode = SyncMode::User(users);
@@ -137,32 +142,53 @@ pub async fn update_groups(
         tokio::spawn(sync_user(
             config.clone(),
             group.clone(),
-            request_id.clone(),
+            correlation_id.to_owned(),
             sync_mode,
         ));
     }
     if !projects.is_empty() {
         let sync_mode = SyncMode::Project(projects);
         info!("lauching projects sync");
-        tokio::spawn(sync_user(config, group, request_id.clone(), sync_mode));
+        tokio::spawn(sync_user(
+            config,
+            group,
+            correlation_id.to_owned(),
+            sync_mode,
+        ));
     }
-    Ok("200")
+    Ok(())
 }
-
-pub async fn update_projects(
+#[tracing::instrument]
+#[axum_macros::debug_handler]
+pub async fn update_groups(
     State(config): State<Arc<RwLock<SiriusConfig>>>,
-    request_id: Extension<RequestId>,
+    headers: HeaderMap,
     cookies: CookieJar,
     Json(payload): Json<Vec<Data>>,
 ) -> Result<&'static str, RouterError> {
     info!("new request!");
-    let request_id = request_id.header_value().to_str()?;
+    let correlation_id = headers
+        .get("correlation_id")
+        .ok_or_else(|| anyhow!("the request as no correlation id!"))?
+        .to_str()?;
     let config = config.read().await.clone();
     let config = Arc::new(config);
+    if let Err(e) = update_groups_handler(config.clone(), cookies, payload, correlation_id).await {
+        send_error(&config.kafka, "error", &e, correlation_id).await?;
+        return Err(e);
+    }
+    Ok("200")
+}
+
+async fn update_projects_handler(
+    config: Arc<SiriusConfig>,
+    cookies: CookieJar,
+    payload: Vec<Data>,
+) -> Result<(), RouterError> {
     let kratos_cookie = match cookies.get("ory_kratos_session") {
         Some(cookie) => cookie,
         None => {
-            error!("{request_id}: kratos cookie not found");
+            error!("kratos cookie not found");
             return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
         }
     };
@@ -172,77 +198,147 @@ pub async fn update_projects(
         .await
         .map_err(|_| RouterError::Status(StatusCode::UNAUTHORIZED))?;
     info!("identity validated");
-    update_controller(config, payload, request_id, identity, "projects").await?;
+    update_controller(config, payload, identity, "projects").await?;
+    Ok(())
+}
+
+#[tracing::instrument]
+#[axum_macros::debug_handler]
+pub async fn update_projects(
+    State(config): State<Arc<RwLock<SiriusConfig>>>,
+    headers: HeaderMap,
+    cookies: CookieJar,
+    Json(payload): Json<Vec<Data>>,
+) -> Result<&'static str, RouterError> {
+    info!("new request!");
+    let correlation_id = headers
+        .get("correlation_id")
+        .ok_or_else(|| anyhow!("the request as no correlation id!"))?
+        .to_str()?;
+
+    let config = config.read().await.clone();
+    let config = Arc::new(config);
+    if let Err(e) = update_projects_handler(config.clone(), cookies, payload).await {
+        send_error(&config.kafka, "error", &e, correlation_id).await?;
+        return Err(e);
+    }
     Ok("200")
 }
 
+async fn list_projects_handler(
+    config: &SiriusConfig,
+    cookies: CookieJar,
+) -> Result<String, RouterError> {
+    let kratos_cookie = match cookies.get("ory_kratos_session") {
+        Some(cookie) => cookie,
+        None => {
+            error!("Kratos cookie not found");
+            return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
+        }
+    };
+    let identity = config.kratos.validate_session(kratos_cookie).await?;
+    info!("identity validated");
+    let data = list_project_controller(identity, config).await?;
+    let resp = serde_json::to_string(&data)?;
+    Ok(resp)
+}
+#[tracing::instrument]
+#[axum_macros::debug_handler]
 pub async fn list_projects(
     State(config): State<Arc<RwLock<SiriusConfig>>>,
-    request_id: Extension<RequestId>,
+    headers: HeaderMap,
     cookies: CookieJar,
 ) -> Result<String, RouterError> {
     info!("new request!");
-    let request_id = request_id.header_value().to_str()?;
+    let correlation_id = headers
+        .get("correlation_id")
+        .ok_or_else(|| anyhow!("the request as no correlation id!"))?
+        .to_str()?;
+
     let config = config.read().await.clone();
+    let ret = list_projects_handler(&config, cookies).await;
+    if let Err(ref e) = ret {
+        send_error(&config.kafka, "error", e, correlation_id).await?;
+    }
+    ret
+}
+
+async fn list_groups_handler(
+    config: &SiriusConfig,
+    cookies: CookieJar,
+) -> Result<String, RouterError> {
     let kratos_cookie = match cookies.get("ory_kratos_session") {
         Some(cookie) => cookie,
         None => {
-            error!("{request_id}: kratos cookie not found");
+            error!("Kratos cookie not found");
             return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
         }
     };
     let identity = config.kratos.validate_session(kratos_cookie).await?;
     info!("identity validated");
-    let data = list_project_controller(request_id, identity, config).await?;
+    let data = list_controller(identity, "group", config).await?;
     let resp = serde_json::to_string(&data)?;
-
     Ok(resp)
 }
 
+#[tracing::instrument]
+#[axum_macros::debug_handler]
 pub async fn list_groups(
     State(config): State<Arc<RwLock<SiriusConfig>>>,
-    request_id: Extension<RequestId>,
+    headers: HeaderMap,
     cookies: CookieJar,
 ) -> Result<String, RouterError> {
     info!("new request!");
-    let request_id = request_id.header_value().to_str()?;
+    let correlation_id = headers
+        .get("correlation_id")
+        .ok_or_else(|| anyhow!("the request as no correlation id!"))?
+        .to_str()?;
+
     let config = config.read().await.clone();
+    let ret = list_groups_handler(&config, cookies).await;
+    if let Err(ref e) = ret {
+        send_error(&config.kafka, "error", e, correlation_id).await?;
+    }
+    ret
+}
+
+async fn list_orga_handler(
+    config: &SiriusConfig,
+    cookies: CookieJar,
+) -> Result<String, RouterError> {
     let kratos_cookie = match cookies.get("ory_kratos_session") {
         Some(cookie) => cookie,
         None => {
-            error!("{request_id}: kratos cookie not found");
+            error!("Kratos cookie not found");
             return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
         }
     };
     let identity = config.kratos.validate_session(kratos_cookie).await?;
     info!("identity validated");
-    let data = list_controller(request_id, identity, "group", config).await?;
+    let data = list_controller(identity, "organisation", config).await?;
     let resp = serde_json::to_string(&data)?;
-
     Ok(resp)
 }
 
+#[tracing::instrument]
+#[axum_macros::debug_handler]
 pub async fn list_orga(
     State(config): State<Arc<RwLock<SiriusConfig>>>,
-    request_id: Extension<RequestId>,
+    headers: HeaderMap,
     cookies: CookieJar,
 ) -> Result<String, RouterError> {
     info!("new request!");
-    let request_id = request_id.header_value().to_str()?;
-    let config = config.read().await.clone();
-    let kratos_cookie = match cookies.get("ory_kratos_session") {
-        Some(cookie) => cookie,
-        None => {
-            error!("{request_id}: kratos cookie not found");
-            return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
-        }
-    };
-    let identity = config.kratos.validate_session(kratos_cookie).await?;
-    info!("identity validated");
-    let data = list_controller(request_id, identity, "organisation", config).await?;
-    let resp = serde_json::to_string(&data)?;
+    let correlation_id = headers
+        .get("correlation_id")
+        .ok_or_else(|| anyhow!("the request as no correlation id!"))?
+        .to_str()?;
 
-    Ok(resp)
+    let config = config.read().await.clone();
+    let ret = list_orga_handler(&config, cookies).await;
+    if let Err(ref e) = ret {
+        send_error(&config.kafka, "error", e, correlation_id).await?;
+    }
+    ret
 }
 
 pub async fn alive() -> Result<&'static str, RouterError> {
@@ -334,7 +430,7 @@ mod http_router_test {
     #[tokio::test]
     async fn test_update_users() {
         let mut kratos_server = Server::new_async().await;
-        let mut opa_server = Server::new_async().await;
+        let opa_server = Server::new_async().await;
         let config = configure(Some(&kratos_server), Some(&opa_server), None).await;
         let body = "[".to_owned() + IDENTITY_USER + "]";
         let session = Session::new(
@@ -396,7 +492,7 @@ mod http_router_test {
     #[tokio::test]
     async fn test_update_group() {
         let mut kratos_server = Server::new_async().await;
-        let mut opa_server = Server::new_async().await;
+        let opa_server = Server::new_async().await;
         let config = configure(Some(&kratos_server), Some(&opa_server), None).await;
         let session = Session::new(
             "bonjour".to_owned(),
@@ -459,7 +555,7 @@ mod http_router_test {
     #[tokio::test]
     async fn test_update_orga() {
         let mut kratos_server = Server::new_async().await;
-        let mut opa_server = Server::new_async().await;
+        let opa_server = Server::new_async().await;
         let config = configure(Some(&kratos_server), Some(&opa_server), None).await;
         let session = Session::new(
             "bonjour".to_owned(),

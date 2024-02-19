@@ -1,11 +1,11 @@
 use axum::http::{StatusCode, Uri};
+use stream_cancel::{Trigger, Tripwire};
 use tokio::signal;
-use tracing::error;
-use tracing::info;
+use tracing::{error, info};
 
 #[cfg(not(tarpaulin_include))]
 ///handle the shutdown signal
-pub async fn shutdown_signal() {
+pub async fn shutdown_signal_trigger(trigger: Trigger) {
     let ctrl_c = async {
         signal::ctrl_c()
             .await
@@ -29,6 +29,13 @@ pub async fn shutdown_signal() {
     }
 
     info!("signal received, starting graceful shutdown");
+    drop(trigger);
+}
+
+#[cfg(not(tarpaulin_include))]
+///handle the shutdown signal
+pub async fn shutdown_signal(shutdown: Tripwire) {
+    shutdown.await;
 }
 
 #[cfg(not(tarpaulin_include))]

@@ -144,7 +144,7 @@ pub static IDENTITY_USER: &str = r#"
             "group":{
                 "7113206d-afc0-41ad-bbca-b1e8113beb82": {
                     "name" : "awesome",
-                    "projects" : [122, 334, 456]
+                    "project" : [122, 334, 456]
                 }
             }
         },
@@ -219,8 +219,8 @@ pub async fn configure(
     };
     kratos.update();
     let mut conf = SiriusConfig::default();
-    conf.mode = "public".to_owned();
-    conf.opa = match opa {
+    conf.opa.mode = "public".to_owned();
+    conf.opa.addr = match opa {
         Some(opa) => opa.url(),
         None => "http://0.0.0.0:8000".to_owned(),
     };

@@ -1,14 +1,22 @@
-use std::sync::Arc;
+use std::{
+    future::{Future, IntoFuture},
+    sync::Arc,
+};
 
 use anyhow::Result;
 use axum::{
+    http::HeaderName,
     routing::{get, post},
-    Router, Server,
+    serve, Router,
 };
-
-use tokio::{sync::RwLock, task::JoinHandle};
-use tower_http::request_id::{MakeRequestUuid, SetRequestIdLayer};
-use tracing::{info, warn};
+use stream_cancel::Tripwire;
+use tokio::{net::TcpListener, sync::RwLock, task::JoinHandle};
+use tower_http::{
+    request_id::{MakeRequestUuid, SetRequestIdLayer},
+    trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer},
+    LatencyUnit,
+};
+use tracing::{info, warn, Level};
 use tracing_subscriber::{fmt, EnvFilter};
 
 use rs_utils::config::{init_watcher, Config};
@@ -19,10 +27,10 @@ pub mod permission {
 
 mod controller;
 mod handelers;
-use handelers::{fallback, shutdown_signal};
+use handelers::{fallback, shutdown_signal, shutdown_signal_trigger};
 mod router;
 use router::{
-    alive, list_groups, list_projects, ready, update_groups, update_organisaion, update_projects,
+    alive, list_groups, list_projects, ready, update_groups, update_organisation, update_projects,
 };
 mod config;
 use config::{SiriusConfig, CONFIG_FALLBACK};
@@ -40,13 +48,26 @@ pub fn app(shared_state: ConfigState) -> Router {
     let api_route = Router::new()
         .route("/project", post(update_projects).get(list_projects))
         .route("/group", post(update_groups).get(list_groups))
-        .route("/organisation", post(update_organisaion).get(list_orga));
+        .route("/organisation", post(update_organisation).get(list_orga));
 
     Router::new()
         .nest("/api/iam", api_route)
         .with_state(shared_state)
         .fallback(fallback)
-        .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
+        .layer(SetRequestIdLayer::new(
+            HeaderName::from_static("correlation_id"),
+            MakeRequestUuid,
+        ))
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::new().include_headers(true))
+                .on_request(DefaultOnRequest::new().level(Level::INFO))
+                .on_response(
+                    DefaultOnResponse::new()
+                        .level(Level::INFO)
+                        .latency_unit(LatencyUnit::Micros),
+                ),
+        )
 }
 
 ///heatlh router config
@@ -60,19 +81,22 @@ pub fn health(shared_state: ConfigState) -> Router {
 }
 
 ///launch http router
-async fn make_http(
+async fn make_http<T>(
     shared_state: ConfigState,
     f: fn(ConfigState) -> Router,
     addr: String,
-) -> JoinHandle<Result<(), hyper::Error>> {
-    //todo: add path for tlscertificate
-    let handle = tokio::spawn(
-        Server::bind(&addr.parse().unwrap())
-            .serve(f(shared_state).into_make_service())
-            .with_graceful_shutdown(shutdown_signal()),
-    );
+    signal: T,
+) -> JoinHandle<Result<(), std::io::Error>>
+where
+    T: Future<Output = ()> + std::marker::Send + 'static,
+{
+    info!("listening on {}", addr);
+    let listener = TcpListener::bind(&addr).await.unwrap();
+    let service = serve(listener, f(shared_state))
+        .with_graceful_shutdown(signal)
+        .into_future();
     info!("lauching http server on: {addr}");
-    handle
+    tokio::spawn(service)
 }
 
 #[cfg(not(tarpaulin_include))]
@@ -91,13 +115,14 @@ async fn main() -> Result<()> {
     let service = config.service.clone();
     let shared_state = Arc::new(RwLock::new(config));
     tokio::spawn(init_watcher(config_path, shared_state.clone(), None));
-
+    let (trigger, shutdown) = Tripwire::new();
+    let signal_sender = shutdown_signal_trigger(trigger);
     info!("statrting http router");
     let http_addr = service.addr.clone() + ":" + &service.ports.main as &str;
-    let http = make_http(shared_state.clone(), app, http_addr).await;
-
+    let http = make_http(shared_state.clone(), app, http_addr, signal_sender).await;
+    let signal_receiver = shutdown_signal(shutdown);
     let health_addr = service.addr.clone() + ":" + &service.ports.health as &str;
-    let health = make_http(shared_state.clone(), health, health_addr).await;
+    let health = make_http(shared_state.clone(), health, health_addr, signal_receiver).await;
     let (http_critical, health_critical) = tokio::try_join!(http, health)?;
     http_critical?;
     health_critical?;
