@@ -15,7 +15,7 @@ spec:
             - name: OPA_POLICY
               value: /data/opa/acl.rego
             - name: OPA_QUERY
-              value: data.map.rbac.main
+              value: data.app.rbac.main
           volumeMounts:
             - mountPath: /data/opa
               name: config-opa
