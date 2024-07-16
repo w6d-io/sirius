@@ -24,8 +24,8 @@ pub async fn shutdown_signal_trigger(trigger: Trigger) {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
+        () = ctrl_c => {},
+        () = terminate => {},
     }
 
     info!("signal received, starting graceful shutdown");

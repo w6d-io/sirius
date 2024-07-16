@@ -13,14 +13,14 @@ fn populate_set(projects: &mut HashSet<String>, mut data: Value) -> Result<()> {
     match data {
         Value::Object(map) => {
             if !map.is_empty() {
-                for (key, _) in map.iter() {
+                for (key, _) in &map {
                     projects.insert(key.to_owned());
                 }
             }
         }
         Value::Array(array) => {
             if !array.is_empty() {
-                for project in array.iter() {
+                for project in &array {
                     let project = project
                         .as_str()
                         .ok_or_else(|| anyhow!(" this shoud be a string"))?;
@@ -39,7 +39,7 @@ fn extract_projects(projects: &mut HashSet<String>, mut data: Value) -> Result<(
         .as_object_mut()
         .ok_or_else(|| anyhow!("this should be a map!"))?;
     if !data.is_empty() {
-        for (_, val) in data.into_iter() {
+        for (_, val) in &mut *data {
             if let Some(proj) = val.get_mut("project") {
                 populate_set(projects, proj.take())?;
             }
@@ -60,12 +60,11 @@ pub async fn list_project_controller(
         _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config"),
     };
 
-    let mut metadata = match meta {
-        Some(mut metadata) => metadata.take(),
-        None => {
-            error!("no metadata in this user!");
-            bail!("no metadata in this user!")
-        }
+    let mut metadata = if let Some(mut metadata) = meta {
+        metadata.take()
+    } else {
+        error!("no metadata in this user!");
+        bail!("no metadata in this user!")
     };
     if let Some(data) = metadata.get_mut("project") {
         info!("extracting project from project");
@@ -95,12 +94,9 @@ pub async fn list_controller(
         _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config"),
     };
 
-    let metadata = match meta {
-        Some(metadata) => metadata,
-        None => {
-            error!("no metadata in this user!");
-            bail!("no metadata in this user!")
-        }
+    let Some(metadata) = meta else {
+        error!("no metadata in this user!");
+        bail!("no metadata in this user!")
     };
     if let Some(data) = metadata.get(data_type) {
         info!("estracting: {data_type}");
@@ -108,7 +104,7 @@ pub async fn list_controller(
             .as_object()
             .ok_or_else(|| anyhow!("this should be a map!"))?;
         if !data.is_empty() {
-            for (uuid, map) in data.iter() {
+            for (uuid, map) in data {
                 let val = map.get("name").ok_or_else(|| anyhow!("no name found !"))?;
                 let name = val
                     .as_str()

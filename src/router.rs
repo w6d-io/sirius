@@ -32,7 +32,7 @@ impl Display for IDType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             IDType::Email(ref id) => write!(f, "{}", id.as_str()),
-            IDType::ID(ref id) => write!(f, "{}", id),
+            IDType::ID(ref id) => write!(f, "{id}"),
         }
     }
 }
@@ -53,12 +53,9 @@ async fn update_organisation_handler(
     payload: Vec<Data>,
     correlation_id: &str,
 ) -> Result<(), RouterError> {
-    let kratos_cookie = match cookies.get("ory_kratos_session") {
-        Some(cookie) => cookie,
-        None => {
-            error!("Kratos cookie not found");
-            return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
-        }
+    let Some(kratos_cookie) = cookies.get("ory_kratos_session") else {
+        error!("Kratos cookie not found");
+        return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
     };
     let identity = config
         .kratos
@@ -69,7 +66,7 @@ async fn update_organisation_handler(
     let mut users = Vec::new();
     for data in &payload {
         if data.ressource_type == "user" {
-            users.push((data.ressource_id.to_owned(), data.value.clone()));
+            users.push((data.ressource_id.clone(), data.value.clone()));
         }
     }
     let identity = update_controller(
@@ -119,12 +116,9 @@ async fn update_groups_handler(
     payload: Vec<Data>,
     correlation_id: &str,
 ) -> Result<(), RouterError> {
-    let kratos_cookie = match cookies.get("ory_kratos_session") {
-        Some(cookie) => cookie,
-        None => {
+    let Some(kratos_cookie) = cookies.get("ory_kratos_session") else {
             error!("Kratos cookie not found");
             return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
-        }
     };
     let identity = config
         .kratos
@@ -136,10 +130,10 @@ async fn update_groups_handler(
     let mut projects = Vec::new();
     for data in &payload {
         if data.ressource_type == "user" {
-            users.push((data.ressource_id.to_owned(), data.value.clone()));
+            users.push((data.ressource_id.clone(), data.value.clone()));
         }
         if data.ressource_type == "project" {
-            projects.push(data.ressource_id.to_owned());
+            projects.push(data.ressource_id.clone());
         }
     }
     info!("users: {users:?}");
@@ -197,12 +191,9 @@ async fn update_projects_handler(
     payload: Vec<Data>,
     correlation_id: &str,
 ) -> Result<(), RouterError> {
-    let kratos_cookie = match cookies.get("ory_kratos_session") {
-        Some(cookie) => cookie,
-        None => {
+    let Some(kratos_cookie) =cookies.get("ory_kratos_session") else {
             error!("kratos cookie not found");
             return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
-        }
     };
     let identity = config
         .kratos
@@ -242,12 +233,9 @@ async fn list_projects_handler(
     config: &SiriusConfig,
     cookies: CookieJar,
 ) -> Result<String, RouterError> {
-    let kratos_cookie = match cookies.get("ory_kratos_session") {
-        Some(cookie) => cookie,
-        None => {
+    let Some(kratos_cookie) = cookies.get("ory_kratos_session") else {
             error!("Kratos cookie not found");
             return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
-        }
     };
     let identity = config.kratos.validate_session(kratos_cookie).await?;
     info!("identity validated");
@@ -280,12 +268,9 @@ async fn list_groups_handler(
     config: &SiriusConfig,
     cookies: CookieJar,
 ) -> Result<String, RouterError> {
-    let kratos_cookie = match cookies.get("ory_kratos_session") {
-        Some(cookie) => cookie,
-        None => {
+    let Some(kratos_cookie) = cookies.get("ory_kratos_session") else {
             error!("Kratos cookie not found");
             return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
-        }
     };
     let identity = config.kratos.validate_session(kratos_cookie).await?;
     info!("identity validated");
@@ -319,12 +304,9 @@ async fn list_orga_handler(
     config: &SiriusConfig,
     cookies: CookieJar,
 ) -> Result<String, RouterError> {
-    let kratos_cookie = match cookies.get("ory_kratos_session") {
-        Some(cookie) => cookie,
-        None => {
+    let Some(kratos_cookie) = cookies.get("ory_kratos_session") else {
             error!("Kratos cookie not found");
             return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
-        }
     };
     let identity = config.kratos.validate_session(kratos_cookie).await?;
     info!("identity validated");

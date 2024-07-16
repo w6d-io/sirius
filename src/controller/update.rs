@@ -33,9 +33,8 @@ async fn get_identity_by_mail(client: &Configuration, id: &str) -> Result<Identi
 }
 
 async fn get_kratos_identity(config: &SiriusConfig, id: &IDType) -> Result<Identity> {
-    let client = match &config.kratos.client {
-        Some(client) => client,
-        None => bail!("kratos client not initialized"),
+    let Some(client) = &config.kratos.client else {
+        bail!("kratos client not initialized")
     };
     let identity = match id {
         IDType::Email(id) => get_identity_by_mail(client, id.as_str()).await?,
@@ -83,7 +82,7 @@ pub async fn update_controller(
     let mut handles = JoinSet::new();
     let mut object_identity: Option<Arc<Identity>> = None;
     let _uri = "api/iam/".to_owned() + endpoint;
-    for data in payload.iter() {
+    for data in &payload {
         #[cfg(feature = "opa")]
         if !validate_roles(
             &config,
@@ -100,22 +99,22 @@ pub async fn update_controller(
         if let Some(ref ident) = object_identity {
             match data.id {
                 IDType::ID(id) if id.to_string() != ident.id => {
-                    object_identity = Some(Arc::new(get_kratos_identity(&config, &data.id).await?))
+                    object_identity = Some(Arc::new(get_kratos_identity(&config, &data.id).await?));
                 }
                 IDType::Email(ref id) => match &ident.traits {
                     Some(traits) => match traits.get("email") {
                         Some(email) if email == id.as_str() => (),
                         _ => {
                             object_identity =
-                                Some(Arc::new(get_kratos_identity(&config, &data.id).await?))
+                                Some(Arc::new(get_kratos_identity(&config, &data.id).await?));
                         }
                     },
                     None => {
                         object_identity =
-                            Some(Arc::new(get_kratos_identity(&config, &data.id).await?))
+                            Some(Arc::new(get_kratos_identity(&config, &data.id).await?));
                     }
                 },
-                _ => (),
+                IDType::ID(_) => (),
             }
         } else {
             object_identity = Some(Arc::new(get_kratos_identity(&config, &data.id).await?));
