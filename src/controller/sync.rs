@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Deref, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::{anyhow, bail, Result};
 use ory_kratos_client::models::Identity;
@@ -12,19 +12,19 @@ use crate::{
     utils::{error::send_error, kafka::send_to_kafka},
 };
 
-async fn extract_sync_id(
+fn extract_sync_id(
     identity: &mut Identity,
     sync_type: &str,
     config: &Arc<SiriusConfig>,
 ) -> Result<HashMap<String, Vec<Value>>> {
-    let mut meta = match &config.opa.mode as &str {
+    let meta = match &config.opa.mode as &str {
         "admin" => &mut identity.metadata_admin,
         "public" => &mut identity.metadata_public,
         "trait" => &mut identity.traits,
         _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config"),
     };
 
-    let Some(metadata) = &mut meta else {
+    let Some(metadata) = meta else {
         error!("No metadata in this group!");
         bail!("No metadata in this group!")
     };
@@ -211,7 +211,7 @@ pub async fn sync(
                     projects.push(new_project);
                 }
             }
-            let users = extract_sync_id(&mut identity, "user", config).await?;
+            let users = extract_sync_id(&mut identity, "user", config)?;
             for (user, role) in users {
                 let json = json!({
                     "name": name,

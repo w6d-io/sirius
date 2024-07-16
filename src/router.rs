@@ -117,8 +117,8 @@ async fn update_groups_handler(
     correlation_id: &str,
 ) -> Result<(), RouterError> {
     let Some(kratos_cookie) = cookies.get("ory_kratos_session") else {
-            error!("Kratos cookie not found");
-            return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
+        error!("Kratos cookie not found");
+        return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
     };
     let identity = config
         .kratos
@@ -191,9 +191,9 @@ async fn update_projects_handler(
     payload: Vec<Data>,
     correlation_id: &str,
 ) -> Result<(), RouterError> {
-    let Some(kratos_cookie) =cookies.get("ory_kratos_session") else {
-            error!("kratos cookie not found");
-            return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
+    let Some(kratos_cookie) = cookies.get("ory_kratos_session") else {
+        error!("kratos cookie not found");
+        return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
     };
     let identity = config
         .kratos
@@ -234,8 +234,8 @@ async fn list_projects_handler(
     cookies: CookieJar,
 ) -> Result<String, RouterError> {
     let Some(kratos_cookie) = cookies.get("ory_kratos_session") else {
-            error!("Kratos cookie not found");
-            return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
+        error!("Kratos cookie not found");
+        return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
     };
     let identity = config.kratos.validate_session(kratos_cookie).await?;
     info!("identity validated");
@@ -269,8 +269,8 @@ async fn list_groups_handler(
     cookies: CookieJar,
 ) -> Result<String, RouterError> {
     let Some(kratos_cookie) = cookies.get("ory_kratos_session") else {
-            error!("Kratos cookie not found");
-            return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
+        error!("Kratos cookie not found");
+        return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
     };
     let identity = config.kratos.validate_session(kratos_cookie).await?;
     info!("identity validated");
@@ -305,8 +305,8 @@ async fn list_orga_handler(
     cookies: CookieJar,
 ) -> Result<String, RouterError> {
     let Some(kratos_cookie) = cookies.get("ory_kratos_session") else {
-            error!("Kratos cookie not found");
-            return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
+        error!("Kratos cookie not found");
+        return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
     };
     let identity = config.kratos.validate_session(kratos_cookie).await?;
     info!("identity validated");

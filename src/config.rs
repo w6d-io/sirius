@@ -48,7 +48,7 @@ impl Producer {
             Some(ref mut prod) => prod,
             None => &mut new_producer,
         };
-        for topic in self.topics.iter() {
+        for topic in &self.topics {
             producer.insert(
                 topic.to_owned(),
                 Arc::new(KafkaProducer::<FutureProducer, DefaultFutureContext>::new(
@@ -113,7 +113,7 @@ pub struct SiriusConfig {
 }
 
 impl Iam {
-    async fn update(&mut self) -> Result<()> {
+    fn update(&mut self) -> Result<()> {
         let addr = "http://".to_string()
             + &self.service.addr as &str
             + ":"
@@ -143,7 +143,7 @@ impl Config for SiriusConfig {
         }
         let mut config: SiriusConfig = Figment::new().merge(Toml::file(path)).extract()?;
         config.kratos.update();
-        config.iam.update().await?;
+        config.iam.update()?;
         config.set_path(path);
         config.kafka.update()?;
         *self = config;
