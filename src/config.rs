@@ -23,7 +23,7 @@ use crate::permission::iam_client::IamClient;
 
 pub const CONFIG_FALLBACK: &str = "test/config.toml";
 
-///structure containing kafka consumer data
+/// Structure representing kafka producer config.
 #[derive(Deserialize, Clone, Default)]
 pub struct Producer {
     pub topics: Vec<String>,
@@ -41,7 +41,7 @@ impl fmt::Debug for Producer {
 }
 
 impl Producer {
-    ///update the producer Producers if needed.
+    /// Update the producer if needed.
     pub fn update(&mut self, broker: &str) -> Result<()> {
         let mut new_producer = HashMap::new();
         let producer = match self.clients {
@@ -61,6 +61,7 @@ impl Producer {
     }
 }
 
+/// Structure representing the kafka config.
 #[derive(Deserialize, Clone, Default, Debug)]
 pub struct Kafka {
     pub broker: String,
@@ -74,18 +75,21 @@ impl Kafka {
     }
 }
 
+/// Structure representing the service port config.
 #[derive(Deserialize, Clone, Default, Debug)]
 pub struct Ports {
     pub main: String,
     pub health: String,
 }
 
+/// Structure representing the service config.
 #[derive(Deserialize, Clone, Default, Debug)]
 pub struct Service {
     pub addr: String,
     pub ports: Ports,
 }
 
+/// Structure representing the iam connection config.
 #[derive(Deserialize, Clone, Default, Debug)]
 pub struct Iam {
     pub service: Service,
@@ -93,13 +97,14 @@ pub struct Iam {
     pub client: Option<IamClient<Channel>>,
 }
 
+/// Structure representing the opa connection config.
 #[derive(Deserialize, Clone, Default, Debug)]
 pub struct Opa {
     pub addr: String,
     pub mode: String,
 }
 
-///structure containing the configuaration of the application
+/// Structure containing the configuaration of the application.
 #[derive(Deserialize, Clone, Default, Debug)]
 pub struct SiriusConfig {
     // pub prefix: String,

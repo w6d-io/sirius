@@ -11,7 +11,14 @@ use crate::{
     permission::{Input, Mode},
     utils::{error::send_error, kafka::send_to_kafka},
 };
+/// Enum representing the diferent sync mode.
+#[derive(Debug)]
+pub enum SyncMode {
+    User(Vec<(String, Value)>),
+    Project(Vec<String>),
+}
 
+/// Extract all the id needing synchronization/
 fn extract_sync_id(
     identity: &mut Identity,
     sync_type: &str,
@@ -41,12 +48,6 @@ fn extract_sync_id(
         }
     };
     Ok(ret)
-}
-
-#[derive(Debug)]
-pub enum SyncMode {
-    User(Vec<(String, Value)>),
-    Project(Vec<String>),
 }
 
 pub async fn sync_groups(
@@ -117,6 +118,8 @@ pub async fn sync_user(
         }
     }
 }
+
+/// Send data to iam to replace data in an identity.
 async fn send_to_iam(
     config: &Arc<SiriusConfig>,
     id: &str,
@@ -148,6 +151,7 @@ async fn send_to_iam(
     Ok(())
 }
 
+/// Extract project ids already present in the identity.
 fn extract_old_project(meta: &mut Value) -> Result<Vec<String>> {
     let old_projects = match meta.get_mut("project") {
         Some(proj) => proj,
@@ -179,6 +183,8 @@ fn extract_old_project(meta: &mut Value) -> Result<Vec<String>> {
     Ok(projects)
 }
 
+/// Sync user metadata, group metadata and organisation metadata.
+/// The mode dermine the type of metadata to sync.
 pub async fn sync(
     config: &Arc<SiriusConfig>,
     mut identity: Identity,

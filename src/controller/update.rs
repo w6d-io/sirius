@@ -17,7 +17,7 @@ use crate::{
     router::{Data, IDType},
 };
 
-///get an identities form kratos by mail
+/// Get an identities from kratos by mail.
 async fn get_identity_by_mail(client: &Configuration, id: &str) -> Result<Identity> {
     let mut addr = format!("{}/admin/identities", client.base_path);
     addr = addr + "?credentials_identifier=" + id;
@@ -32,6 +32,7 @@ async fn get_identity_by_mail(client: &Configuration, id: &str) -> Result<Identi
     Ok(identity)
 }
 
+/// Get an identity from kratos.
 async fn get_kratos_identity(config: &SiriusConfig, id: &IDType) -> Result<Identity> {
     let Some(client) = &config.kratos.client else {
         bail!("kratos client not initialized")
@@ -43,6 +44,7 @@ async fn get_kratos_identity(config: &SiriusConfig, id: &IDType) -> Result<Ident
     Ok(identity)
 }
 
+/// Send data to iam to add permition to an identity.
 async fn send_to_iam(identity: Arc<Identity>, config: Arc<SiriusConfig>, data: Data) -> Result<()> {
     let mut client = config
         .iam
@@ -71,7 +73,7 @@ async fn send_to_iam(identity: Arc<Identity>, config: Arc<SiriusConfig>, data: D
     Ok(())
 }
 
-///send a call to iam to update an identity metadata
+/// Send a call to iam to update an identity metadata.
 pub async fn update_controller(
     config: Arc<SiriusConfig>,
     payload: Vec<Data>,

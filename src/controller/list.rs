@@ -8,6 +8,7 @@ use tracing::{debug, error, info};
 
 use crate::config::SiriusConfig;
 
+/// Populate the projects id HashSet with the given data.
 fn populate_set(projects: &mut HashSet<String>, mut data: Value) -> Result<()> {
     let data = data.take();
     match data {
@@ -33,6 +34,7 @@ fn populate_set(projects: &mut HashSet<String>, mut data: Value) -> Result<()> {
     Ok(())
 }
 
+/// Extract the projects id from the identity and store them in the projects hashset.
 fn extract_projects(projects: &mut HashSet<String>, mut data: Value) -> Result<()> {
     debug!("{data:?}");
     let data = data
@@ -48,6 +50,8 @@ fn extract_projects(projects: &mut HashSet<String>, mut data: Value) -> Result<(
     Ok(())
 }
 
+/// extract projects id from the identity in project, group and organisation and returns them in a
+/// hashset.
 pub async fn list_project_controller(
     identity: Identity,
     config: &SiriusConfig,
@@ -81,6 +85,8 @@ pub async fn list_project_controller(
     Ok(projects)
 }
 
+/// Extract the ask data type of a given identity.
+/// Where it recuperate them is configured with mode in the opa section of te config file.
 pub async fn list_controller(
     identity: Identity,
     data_type: &str,
@@ -99,7 +105,7 @@ pub async fn list_controller(
         bail!("no metadata in this user!")
     };
     if let Some(data) = metadata.get(data_type) {
-        info!("estracting: {data_type}");
+        info!("extracting: {data_type}");
         let data = data
             .as_object()
             .ok_or_else(|| anyhow!("this should be a map!"))?;

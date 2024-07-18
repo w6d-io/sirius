@@ -10,7 +10,7 @@ use tracing::info;
 
 use crate::config::Kafka;
 
-///Send data to kafka.
+/// Send data to kafka.
 #[cfg(not(tarpaulin_include))]
 pub async fn send_to_kafka<T: Serialize>(
     _config: &Kafka,
