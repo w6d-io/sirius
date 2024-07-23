@@ -18,7 +18,7 @@ pub enum SyncMode {
     Project(Vec<String>),
 }
 
-/// Extract all the id needing synchronization/
+/// Extract all the id needing synchronization.
 fn extract_sync_id(
     identity: &mut Identity,
     sync_type: &str,
@@ -50,6 +50,7 @@ fn extract_sync_id(
     Ok(ret)
 }
 
+///synchronize th groups in the users identities
 pub async fn sync_groups(
     config: Arc<SiriusConfig>,
     identity: &Identity,
@@ -90,6 +91,7 @@ pub async fn sync_groups(
     Ok(())
 }
 
+/// synchronize groups identities
 pub async fn sync_user(
     config: Arc<SiriusConfig>,
     identity: Identity,
