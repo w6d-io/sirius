@@ -3,13 +3,14 @@ use serde::Serialize;
 
 use crate::{config::Kafka, utils::kafka::send_to_kafka};
 
+/// Repesentation of the data to send to the error kafka topic.
 #[derive(Serialize)]
 pub struct ErrorData<'a> {
     code: &'a str,
     message: String,
 }
 
-///send error to the given kafka topic
+///Send error to the given kafka topic.
 #[cfg(not(tarpaulin_include))]
 pub async fn send_error<T>(config: &Kafka, topic: &str, data: T, correlation_id: &str) -> Result<()>
 where

@@ -10,7 +10,7 @@ use tracing::info;
 
 use crate::config::Kafka;
 
-///Send data to kafka.
+/// Send data to kafka.
 #[cfg(not(tarpaulin_include))]
 pub async fn send_to_kafka<T: Serialize>(
     _config: &Kafka,
@@ -32,7 +32,7 @@ pub async fn send_to_kafka<T: Serialize>(
                 .get(_topic)
                 .ok_or_else(|| anyhow!("failed to get asked kafka topic!"))?
                 .produce(_message, Some(Duration::from_secs(30)))
-                .await?
+                .await?;
         }
         None => bail!("topic not found"),
     }

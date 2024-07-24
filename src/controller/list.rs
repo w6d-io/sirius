@@ -8,19 +8,20 @@ use tracing::{debug, error, info};
 
 use crate::config::SiriusConfig;
 
+/// Populate the projects id HashSet with the given data.
 fn populate_set(projects: &mut HashSet<String>, mut data: Value) -> Result<()> {
     let data = data.take();
     match data {
         Value::Object(map) => {
             if !map.is_empty() {
-                for (key, _) in map.iter() {
+                for (key, _) in &map {
                     projects.insert(key.to_owned());
                 }
             }
         }
         Value::Array(array) => {
             if !array.is_empty() {
-                for project in array.iter() {
+                for project in &array {
                     let project = project
                         .as_str()
                         .ok_or_else(|| anyhow!(" this shoud be a string"))?;
@@ -33,13 +34,14 @@ fn populate_set(projects: &mut HashSet<String>, mut data: Value) -> Result<()> {
     Ok(())
 }
 
+/// Extract the projects id from the identity and store them in the projects hashset.
 fn extract_projects(projects: &mut HashSet<String>, mut data: Value) -> Result<()> {
     debug!("{data:?}");
     let data = data
         .as_object_mut()
         .ok_or_else(|| anyhow!("this should be a map!"))?;
     if !data.is_empty() {
-        for (_, val) in data.into_iter() {
+        for (_, val) in &mut *data {
             if let Some(proj) = val.get_mut("project") {
                 populate_set(projects, proj.take())?;
             }
@@ -48,6 +50,8 @@ fn extract_projects(projects: &mut HashSet<String>, mut data: Value) -> Result<(
     Ok(())
 }
 
+/// extract projects id from the identity in project, group and organisation and returns them in a
+/// hashset.
 pub async fn list_project_controller(
     identity: Identity,
     config: &SiriusConfig,
@@ -60,12 +64,11 @@ pub async fn list_project_controller(
         _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config"),
     };
 
-    let mut metadata = match meta {
-        Some(mut metadata) => metadata.take(),
-        None => {
-            error!("no metadata in this user!");
-            bail!("no metadata in this user!")
-        }
+    let mut metadata = if let Some(mut metadata) = meta {
+        metadata.take()
+    } else {
+        error!("no metadata in this user!");
+        bail!("no metadata in this user!")
     };
     if let Some(data) = metadata.get_mut("project") {
         info!("extracting project from project");
@@ -82,6 +85,8 @@ pub async fn list_project_controller(
     Ok(projects)
 }
 
+/// Extract the ask data type of a given identity.
+/// Where it recuperate them is configured with mode in the opa section of te config file.
 pub async fn list_controller(
     identity: Identity,
     data_type: &str,
@@ -95,20 +100,17 @@ pub async fn list_controller(
         _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config"),
     };
 
-    let metadata = match meta {
-        Some(metadata) => metadata,
-        None => {
-            error!("no metadata in this user!");
-            bail!("no metadata in this user!")
-        }
+    let Some(metadata) = meta else {
+        error!("no metadata in this user!");
+        bail!("no metadata in this user!")
     };
     if let Some(data) = metadata.get(data_type) {
-        info!("estracting: {data_type}");
+        info!("extracting: {data_type}");
         let data = data
             .as_object()
             .ok_or_else(|| anyhow!("this should be a map!"))?;
         if !data.is_empty() {
-            for (uuid, map) in data.iter() {
+            for (uuid, map) in data {
                 let val = map.get("name").ok_or_else(|| anyhow!("no name found !"))?;
                 let name = val
                     .as_str()
