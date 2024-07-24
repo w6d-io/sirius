@@ -29,15 +29,15 @@ In all the POST case you must use this json payload:
     "value" = json value
 }
 ```
-> The id field represent the id of the identity to modify(can be anid or an email
+> __id__: field represent the id of the identity to modify(can be anid or an email
 depending on the route).
 
 
-> The resource_type field represent the type of permission to modify:
+> __resource_type__: field represent the type of permission to modify:
 > - user
 > - group
 > - organization
 
-> - The ressource id represent the id of resource to modify.
+> - __ressource_id__: represent the id of resource to modify.
 
-> - the value field represent the data to modify the identity with
+> - __value__: field represent the data to modify the identity with
