@@ -38,6 +38,6 @@ depending on the route).
 > - group
 > - organization
 
-> - __ressource_id__: represent the id of resource to modify.
+> __ressource_id__: represent the id of resource to modify.
 
-> - __value__: field represent the data to modify the identity with
+> __value__: field represent the data to modify the identity with
