@@ -1,7 +1,7 @@
 # sirius
 
 ## SIRIUS
-Sirius is an api that use to list and modify kratos identity.
+Sirius is an api that used to list and modify kratos identity.
 
 ### routes
 
@@ -20,7 +20,7 @@ This route is used to list organisations in an identity or add  to a group
 send a GET request with a kratos cookie to list the organizations in the identity.
 send a POST request with a kratos cookie and the projects, groups or users to add.
 
-In all the POST case you must use the payload json:
+In all the POST case you must use this json payload:
 ```json
 {
     "id" = "string"
@@ -29,14 +29,15 @@ In all the POST case you must use the payload json:
     "value" = json value
 }
 ```
-The id field represent the id of the identity to modify(can be anid or an email
+> __id__: field represent the id of the identity to modify(can be anid or an email
 depending on the route).
 
-The resource_type field represent the type of permission to modify:
-- user
-- group
-- organization
 
-The ressource id represent the id of resource to modify.
+> __resource_type__: field represent the type of permission to modify:
+> - user
+> - group
+> - organization
 
-the value field represent the data to modify the identity with
+> __ressource_id__: represent the id of resource to modify.
+
+> __value__: field represent the data to modify the identity with
