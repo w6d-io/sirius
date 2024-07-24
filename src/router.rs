@@ -21,6 +21,7 @@ use crate::{
     utils::error::send_error,
 };
 
+/// Enum representing  the type of id to use to get the kratos identity.
 #[derive(Deserialize, Clone, Debug)]
 #[serde(untagged)]
 pub enum IDType {
@@ -32,11 +33,12 @@ impl Display for IDType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             IDType::Email(ref id) => write!(f, "{}", id.as_str()),
-            IDType::ID(ref id) => write!(f, "{}", id),
+            IDType::ID(ref id) => write!(f, "{id}"),
         }
     }
 }
 
+/// Structure representing the payload data.
 #[derive(Deserialize, Clone, Debug)]
 pub struct Data {
     //id :can be the email or the uuid depending of the endpoint
@@ -53,12 +55,9 @@ async fn update_organisation_handler(
     payload: Vec<Data>,
     correlation_id: &str,
 ) -> Result<(), RouterError> {
-    let kratos_cookie = match cookies.get("ory_kratos_session") {
-        Some(cookie) => cookie,
-        None => {
-            error!("Kratos cookie not found");
-            return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
-        }
+    let Some(kratos_cookie) = cookies.get("ory_kratos_session") else {
+        error!("Kratos cookie not found");
+        return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
     };
     let identity = config
         .kratos
@@ -69,7 +68,7 @@ async fn update_organisation_handler(
     let mut users = Vec::new();
     for data in &payload {
         if data.ressource_type == "user" {
-            users.push((data.ressource_id.to_owned(), data.value.clone()));
+            users.push((data.ressource_id.clone(), data.value.clone()));
         }
     }
     let identity = update_controller(
@@ -89,6 +88,8 @@ async fn update_organisation_handler(
     }
     Ok(())
 }
+
+/// This route is used to update the groups of an organization them sync the groups and the users.
 #[tracing::instrument]
 #[axum_macros::debug_handler]
 pub async fn update_organisation(
@@ -119,12 +120,9 @@ async fn update_groups_handler(
     payload: Vec<Data>,
     correlation_id: &str,
 ) -> Result<(), RouterError> {
-    let kratos_cookie = match cookies.get("ory_kratos_session") {
-        Some(cookie) => cookie,
-        None => {
-            error!("Kratos cookie not found");
-            return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
-        }
+    let Some(kratos_cookie) = cookies.get("ory_kratos_session") else {
+        error!("Kratos cookie not found");
+        return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
     };
     let identity = config
         .kratos
@@ -136,10 +134,10 @@ async fn update_groups_handler(
     let mut projects = Vec::new();
     for data in &payload {
         if data.ressource_type == "user" {
-            users.push((data.ressource_id.to_owned(), data.value.clone()));
+            users.push((data.ressource_id.clone(), data.value.clone()));
         }
         if data.ressource_type == "project" {
-            projects.push(data.ressource_id.to_owned());
+            projects.push(data.ressource_id.clone());
         }
     }
     info!("users: {users:?}");
@@ -169,6 +167,8 @@ async fn update_groups_handler(
     }
     Ok(())
 }
+
+/// This route is used to update a group then sync the users groups and projects.
 #[tracing::instrument]
 #[axum_macros::debug_handler]
 pub async fn update_groups(
@@ -197,12 +197,9 @@ async fn update_projects_handler(
     payload: Vec<Data>,
     correlation_id: &str,
 ) -> Result<(), RouterError> {
-    let kratos_cookie = match cookies.get("ory_kratos_session") {
-        Some(cookie) => cookie,
-        None => {
-            error!("kratos cookie not found");
-            return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
-        }
+    let Some(kratos_cookie) = cookies.get("ory_kratos_session") else {
+        error!("kratos cookie not found");
+        return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
     };
     let identity = config
         .kratos
@@ -214,6 +211,7 @@ async fn update_projects_handler(
     Ok(())
 }
 
+/// This route is used to update an user projects.
 #[tracing::instrument]
 #[axum_macros::debug_handler]
 pub async fn update_projects(
@@ -242,12 +240,9 @@ async fn list_projects_handler(
     config: &SiriusConfig,
     cookies: CookieJar,
 ) -> Result<String, RouterError> {
-    let kratos_cookie = match cookies.get("ory_kratos_session") {
-        Some(cookie) => cookie,
-        None => {
-            error!("Kratos cookie not found");
-            return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
-        }
+    let Some(kratos_cookie) = cookies.get("ory_kratos_session") else {
+        error!("Kratos cookie not found");
+        return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
     };
     let identity = config.kratos.validate_session(kratos_cookie).await?;
     info!("identity validated");
@@ -255,6 +250,8 @@ async fn list_projects_handler(
     let resp = serde_json::to_string(&data)?;
     Ok(resp)
 }
+
+///This route list all the projects from an identity in the configured mode (public, admin or trait).
 #[tracing::instrument]
 #[axum_macros::debug_handler]
 pub async fn list_projects(
@@ -280,12 +277,9 @@ async fn list_groups_handler(
     config: &SiriusConfig,
     cookies: CookieJar,
 ) -> Result<String, RouterError> {
-    let kratos_cookie = match cookies.get("ory_kratos_session") {
-        Some(cookie) => cookie,
-        None => {
-            error!("Kratos cookie not found");
-            return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
-        }
+    let Some(kratos_cookie) = cookies.get("ory_kratos_session") else {
+        error!("Kratos cookie not found");
+        return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
     };
     let identity = config.kratos.validate_session(kratos_cookie).await?;
     info!("identity validated");
@@ -294,6 +288,7 @@ async fn list_groups_handler(
     Ok(resp)
 }
 
+///This route list the groups from an identity in the configured mode (public, admin or trait).
 #[tracing::instrument]
 #[axum_macros::debug_handler]
 pub async fn list_groups(
@@ -319,12 +314,9 @@ async fn list_orga_handler(
     config: &SiriusConfig,
     cookies: CookieJar,
 ) -> Result<String, RouterError> {
-    let kratos_cookie = match cookies.get("ory_kratos_session") {
-        Some(cookie) => cookie,
-        None => {
-            error!("Kratos cookie not found");
-            return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
-        }
+    let Some(kratos_cookie) = cookies.get("ory_kratos_session") else {
+        error!("Kratos cookie not found");
+        return Err(RouterError::Status(StatusCode::UNAUTHORIZED));
     };
     let identity = config.kratos.validate_session(kratos_cookie).await?;
     info!("identity validated");
@@ -333,6 +325,7 @@ async fn list_orga_handler(
     Ok(resp)
 }
 
+///This route list all the organisations from an identity in the configured mode (public, admin or trait).
 #[tracing::instrument]
 #[axum_macros::debug_handler]
 pub async fn list_orga(

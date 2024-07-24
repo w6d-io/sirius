@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Deref, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::{anyhow, bail, Result};
 use ory_kratos_client::models::Identity;
@@ -11,25 +11,29 @@ use crate::{
     permission::{Input, Mode},
     utils::{error::send_error, kafka::send_to_kafka},
 };
+/// Enum representing the diferent sync mode.
+#[derive(Debug)]
+pub enum SyncMode {
+    User(Vec<(String, Value)>),
+    Project(Vec<String>),
+}
 
-async fn extract_sync_id(
+/// Extract all the id needing synchronization.
+fn extract_sync_id(
     identity: &mut Identity,
     sync_type: &str,
     config: &Arc<SiriusConfig>,
 ) -> Result<HashMap<String, Vec<Value>>> {
-    let mut meta = match &config.opa.mode as &str {
+    let meta = match &config.opa.mode as &str {
         "admin" => &mut identity.metadata_admin,
         "public" => &mut identity.metadata_public,
         "trait" => &mut identity.traits,
         _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config"),
     };
 
-    let metadata = match &mut meta {
-        Some(ref mut metadata) => metadata,
-        None => {
-            error!("No metadata in this group!");
-            bail!("No metadata in this group!")
-        }
+    let Some(metadata) = meta else {
+        error!("No metadata in this group!");
+        bail!("No metadata in this group!")
     };
     let mut ret = HashMap::new();
     if let Some(val) = metadata.get(sync_type) {
@@ -46,12 +50,7 @@ async fn extract_sync_id(
     Ok(ret)
 }
 
-#[derive(Debug)]
-pub enum SyncMode {
-    User(Vec<(String, Value)>),
-    Project(Vec<String>),
-}
-
+///synchronize th groups in the users identities
 pub async fn sync_groups(
     config: Arc<SiriusConfig>,
     identity: &Identity,
@@ -78,10 +77,10 @@ pub async fn sync_groups(
     let mut default_group_id = String::new();
     info!("recuparating default group");
     for (id, data) in groups {
-        println!("data: {}", data);
+        println!("data: {data}");
         let name = data.as_str().ok_or_else(|| anyhow!("name not a string!"))?;
         if name == "default" {
-            default_group_id = id.to_owned();
+            id.clone_into(&mut default_group_id);
         }
     }
     info!("sending payload to iam!");
@@ -92,6 +91,7 @@ pub async fn sync_groups(
     Ok(())
 }
 
+/// synchronize groups identities
 pub async fn sync_user(
     config: Arc<SiriusConfig>,
     identity: Identity,
@@ -99,10 +99,9 @@ pub async fn sync_user(
     mode: SyncMode,
 ) {
     match sync(&config, identity, mode).await {
-        Ok(_) => {
+        Ok(()) => {
             if let Err(e) = send_to_kafka(&config.kafka, "notif", "ok".to_string(), None).await {
-                if let Err(e) = send_error(&config.kafka, "error", e.deref(), &correlation_id).await
-                {
+                if let Err(e) = send_error(&config.kafka, "error", &*e, &correlation_id).await {
                     error!("{e}");
                     return;
                 }
@@ -111,7 +110,7 @@ pub async fn sync_user(
         }
         Err(e) => {
             error!("an error has occurred when syncing data: {e}");
-            let res = send_error(&config.kafka, "error", e.deref(), &correlation_id).await;
+            let res = send_error(&config.kafka, "error", &*e, &correlation_id).await;
             if let Err(e) = send_to_kafka(&config.kafka, "notif", "ko", None).await {
                 error!("{e}");
             }
@@ -121,6 +120,8 @@ pub async fn sync_user(
         }
     }
 }
+
+/// Send data to iam to replace data in an identity.
 async fn send_to_iam(
     config: &Arc<SiriusConfig>,
     id: &str,
@@ -152,6 +153,40 @@ async fn send_to_iam(
     Ok(())
 }
 
+/// Extract project ids already present in the identity.
+fn extract_old_project(meta: &mut Value) -> Result<Vec<String>> {
+    let old_projects = match meta.get_mut("project") {
+        Some(proj) => proj,
+        None => &mut Value::Null,
+    };
+
+    let projects = match old_projects {
+        Value::Object(projects) => projects
+            .keys()
+            .map(|e| e.as_str().to_owned())
+            .collect::<Vec<String>>(),
+        Value::Array(projects) => {
+            let mut ret = Vec::new();
+            for project in projects {
+                ret.push(
+                    project
+                        .as_u64()
+                        .ok_or_else(|| anyhow!("not a number"))?
+                        .to_string(),
+                );
+            }
+            ret
+        }
+        Value::Null => Vec::new(),
+        _ => {
+            bail!("Projects in this metadata are badly formated it should be array, object or null!\nFound: {}", old_projects.to_string());
+        }
+    };
+    Ok(projects)
+}
+
+/// Sync user metadata, group metadata and organisation metadata.
+/// The mode dermine the type of metadata to sync.
 pub async fn sync(
     config: &Arc<SiriusConfig>,
     mut identity: Identity,
@@ -164,35 +199,10 @@ pub async fn sync(
         "trait" => &mut identity.traits,
         _ => bail!("Invalid mode! please put a valid mode (admin, public or trait) in the config"),
     };
-    let mut projects = match meta {
-        Some(ref mut meta) => match meta.get_mut("project") {
-            Some(proj) => match proj.as_object() {
-                Some(old_projects) => old_projects
-                    .keys()
-                    .map(|e| e.as_str().to_owned())
-                    .collect::<Vec<String>>(),
-                None => {
-                    let mut ret = Vec::new();
-                    let old_projects = proj
-                        .as_array()
-                        .ok_or_else(|| anyhow!("not an object or an array!"))?;
-                    for project in old_projects.iter() {
-                        ret.push(
-                            project
-                                .as_u64()
-                                .ok_or_else(|| anyhow!("not a number"))?
-                                .to_string(),
-                        )
-                    }
-                    ret
-                }
-            },
-            None => Vec::new(),
-        },
-        None => {
-            bail!("this group as no metadata!");
-        }
+    let Some(meta) = meta else {
+        bail!("this group as no metadata!");
     };
+    let mut projects = extract_old_project(meta)?;
     let name = match identity.traits {
         Some(ref mut traits) => traits
             .get_mut("name")
@@ -209,7 +219,7 @@ pub async fn sync(
                     projects.push(new_project);
                 }
             }
-            let users = extract_sync_id(&mut identity, "user", config).await?;
+            let users = extract_sync_id(&mut identity, "user", config)?;
             for (user, role) in users {
                 let json = json!({
                     "name": name,

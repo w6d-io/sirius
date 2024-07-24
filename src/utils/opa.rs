@@ -5,6 +5,7 @@ use rs_utils::kratos::Identity;
 
 use crate::config::SiriusConfig;
 
+/// Structure representing the input part of the structure to esnd to opa.
 #[derive(Deserialize, Serialize)]
 struct Input<'a> {
     uri: &'a str,
@@ -13,12 +14,15 @@ struct Input<'a> {
     resource: &'a str,
 }
 
+/// Structure representing the data to send to opa.
 #[derive(Deserialize, Serialize)]
 struct OpaData<'a> {
     #[serde(borrow)]
     input: Input<'a>,
     data: Identity,
 }
+
+/// Call the opa api to validate the role.
 pub async fn validate_roles(
     config: &SiriusConfig,
     identity: &Identity,

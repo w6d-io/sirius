@@ -1,4 +1,4 @@
-FROM rust:1.75-bullseye AS build
+FROM rust:1.79-bullseye AS build
 ARG JOB_TOKEN
 ARG JOB_USER
 ENV CARGO_NET_GIT_FETCH_WITH_CLI true
